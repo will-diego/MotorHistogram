@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Streamlit Motor Data Analysis Dashboard - Fixed Version
+Streamlit Motor Data Analysis Dashboard
 Interactive web interface for PostHog motor data visualization and analysis
 """
 
@@ -50,25 +50,13 @@ st.markdown("""
 
 # === AUTHENTICATION SYSTEM ===
 
-# Safe import of authentication config
+# Import authentication config from external file
 try:
     from config import AUTH_USERS, POSTHOG_API_KEY, POSTHOG_PROJECT_ID
     USERS = AUTH_USERS
-    st.success("✅ Config imported successfully")
-except ImportError as e:
-    st.error(f"❌ Config import failed: {e}")
-    # Fallback authentication for debugging
-    USERS = {
-        "will": "832816e4cdf8e0501116098ef850deb1a42bf3cbdc07af319086c4439b14c407",
-        "bimotal": "e4f009916270bff8106f9bbd562d1937e4fdb92b1df2ad570458767e8051d71e"
-    }
-    POSTHOG_API_KEY = "phx_ETiyf25aQLPtOPBBnPHYi6vJCPvKOtalYtaAWIZ1XhvNs6n"
-    POSTHOG_PROJECT_ID = "113002"
-    st.warning("⚠️ Using fallback authentication")
-except Exception as e:
-    st.error(f"❌ Unexpected error loading config: {e}")
-    st.error(f"Error type: {type(e)}")
-    st.error(f"Error details: {str(e)}")
+    # This ensures environment variables are set for subprocess calls
+except ImportError:
+    st.error("❌ Authentication configuration file not found. Please contact administrator.")
     st.stop()
 
 def hash_password(password):
@@ -107,6 +95,18 @@ def show_login_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
+        # Login card
+        st.markdown("""
+        <div style="
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb;
+        ">
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.markdown("### 🔐 Login to Dashboard")
         
         with st.form("login_form"):
@@ -126,73 +126,831 @@ def show_login_page():
                         st.error("❌ Invalid username or password")
                 else:
                     st.warning("⚠️ Please enter both username and password")
+        
+
+        
+        st.markdown("---")
+        st.markdown("""
+        <div style="text-align: center; color: #6b7280; font-size: 0.9rem;">
+            <p>🔒 Secure access to motor data analytics and visualization tools</p>
+            <p>Built with Streamlit • PostHog Integration • Interactive Charts</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+def format_timestamp_readable(timestamp_str):
+    """Convert ISO timestamp to readable American format with Pacific Time"""
+    try:
+        # Parse the ISO timestamp
+        if timestamp_str.endswith('Z'):
+            dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        elif '+00:00' in timestamp_str:
+            dt = datetime.fromisoformat(timestamp_str)
+        else:
+            # Try parsing without timezone info, assume UTC
+            dt = datetime.fromisoformat(timestamp_str.replace('Z', ''))
+            dt = dt.replace(tzinfo=pytz.UTC)
+        
+        # Convert to Pacific Time
+        pacific = pytz.timezone('US/Pacific')
+        pt_time = dt.astimezone(pacific)
+        
+        # Format as MM/DD/YYYY HH:MM:SS AM/PM PT
+        formatted = pt_time.strftime('%m/%d/%Y %I:%M:%S %p PT')
+        return formatted
+    except Exception as e:
+        # If parsing fails, return original timestamp
+        return timestamp_str
+
+def load_available_data():
+    """Load all available CSV data files"""
+    data = {}
+    csv_pattern = "csv_outputs/posthog_event_*.csv"
+    csv_files = glob.glob(csv_pattern)
+    
+    # Only load data if it exists AND we're not in initial empty state
+    if not csv_files:
+        return {}
+    
+    # Check if files are very small (just headers) and skip if so
+    for file_path in csv_files:
+        try:
+            # Check file size - if less than 100 bytes, probably just headers
+            if os.path.getsize(file_path) < 100:
+                continue
+                
+            df = pd.read_csv(file_path)
+            if len(df) == 0:  # Empty dataframe
+                continue
+                
+            # Extract category name from filename
+            filename = os.path.basename(file_path)
+            category = filename.replace("posthog_event_", "").replace(".csv", "")
+            data[category] = df
+        except Exception as e:
+            st.warning(f"Could not load {file_path}: {e}")
+    
+    return data
+
+def load_histogram_data():
+    """Load histogram data files"""
+    data = {}
+    csv_pattern = "histogram_outputs/*_numeric_values.csv"
+    csv_files = glob.glob(csv_pattern)
+    
+    # Only load if files exist and have content
+    for file_path in csv_files:
+        try:
+            # Check file size 
+            if os.path.getsize(file_path) < 50:
+                continue
+                
+            df = pd.read_csv(file_path)
+            if len(df) == 0:
+                continue
+                
+            # Extract category name from filename
+            filename = os.path.basename(file_path)
+            category = filename.replace("_numeric_values.csv", "")
+            data[category] = df
+        except Exception as e:
+            st.warning(f"Could not load {file_path}: {e}")
+    
+    return data
+
+def create_interactive_histogram(df, category):
+    """Create an interactive Plotly histogram"""
+    fig = go.Figure()
+    
+    # Create bar chart
+    fig.add_trace(go.Bar(
+        x=df['Numeric_Label'],
+        y=df['Value'],
+        text=df['Value'],
+        textposition='auto',
+        hovertemplate='<b>Index:</b> %{x}<br><b>Value:</b> %{y}<br><b>Property:</b> %{customdata}<extra></extra>',
+        customdata=df['Original_Property'],
+        marker=dict(
+            color=df['Value'],
+            colorscale='viridis',
+            showscale=True,
+            colorbar=dict(title="Value")
+        )
+    ))
+    
+    fig.update_layout(
+        title=f'{category.replace("_", " ").title()} - Interactive Analysis',
+        xaxis_title='Index',
+        yaxis_title='Values',
+        height=500,
+        showlegend=False
+    )
+    
+    return fig
+
+def run_data_collection(person_id, session_id=None, timestamp=None):
+    """Run the data collection script"""
+    cmd = ["/usr/bin/python3", "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id]
+    
+    if session_id:
+        cmd.extend(["-s", session_id])
+    if timestamp:
+        cmd.extend(["-t", timestamp])
+    
+    try:
+        # Debug: show the command being run (truncate long arguments)
+        cmd_display = []
+        for arg in cmd:
+            if len(arg) > 50:
+                cmd_display.append(arg[:50] + "...")
+            else:
+                cmd_display.append(arg)
+        st.info(f"🔧 Running command: {' '.join(cmd_display)}")
+        
+        with st.spinner("Downloading data from PostHog..."):
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        st.success("✅ Data downloaded successfully!")
+        return True, result.stdout
+    except subprocess.CalledProcessError as e:
+        # Show both stdout and stderr for debugging
+        st.error(f"❌ Error downloading data:")
+        st.code(f"Exit code: {e.returncode}")
+        if e.stdout:
+            st.code(f"STDOUT:\n{e.stdout}")
+        if e.stderr:
+            st.code(f"STDERR:\n{e.stderr}")
+        
+        # Check if it's a timestamp not found issue
+        if "No event found with timestamp matching" in str(e.stdout):
+            st.warning("⚠️ Timestamp not found in available data.")
+            
+            # Extract available timestamps from output
+            if "Available timestamps:" in str(e.stdout):
+                lines = str(e.stdout).split('\n')
+                timestamps = []
+                capture_timestamps = False
+                for line in lines:
+                    if "Available timestamps:" in line:
+                        capture_timestamps = True
+                        continue
+                    if capture_timestamps and line.strip().startswith('- '):
+                        timestamp = line.strip()[2:]  # Remove '- ' prefix
+                        timestamps.append(timestamp)
+                
+                if timestamps:
+                    st.info("💡 Try using one of these available timestamps instead:")
+                    for ts in timestamps[:5]:  # Show first 5
+                        st.code(ts)
+                    
+                    st.info("🔧 Or clear the timestamp field to fetch the most recent data.")
+            
+            return False, "Timestamp not found"
+        
+        # Check if it's just a warning issue
+        elif "NotOpenSSLWarning" in str(e.stderr) or "urllib3" in str(e.stderr):
+            st.warning("⚠️ This appears to be just an SSL warning. The script may have run successfully.")
+            st.info("💡 Check the CSV outputs folder to see if data was downloaded.")
+            return True, e.stderr
+        else:
+            return False, e.stderr
+
+def list_recent_events(person_id, limit=25):
+    """List recent Motor Data events for a person"""
+    # Don't use session filtering when browsing - we want to see ALL events for this person
+    cmd = ["/usr/bin/python3", "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-s", "", "-l"]
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return True, result.stdout
+    except subprocess.CalledProcessError as e:
+        return False, e.stderr
+
+def run_data_collection_with_timestamp(person_id, timestamp):
+    """Run data collection for a specific timestamp"""
+    # Don't pass session ID when fetching specific timestamp - let it find the event regardless of session
+    cmd = ["/usr/bin/python3", "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", timestamp, "-s", ""]
+    
+    try:
+        with st.spinner(f"Downloading data for {format_timestamp_readable(timestamp)}..."):
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        
+        # Check if successful by looking for success indicators in output
+        if "successfully fetched" in result.stdout.lower() or "saved to" in result.stdout.lower():
+            st.success("✅ Data downloaded successfully!")
+            
+            # Show a summary of what was downloaded
+            lines = result.stdout.split('\n')
+            saved_files = [line for line in lines if 'saved to' in line.lower()]
+            if saved_files:
+                st.info(f"📁 Files created: {len(saved_files)}")
+                for file_line in saved_files[:3]:  # Show first 3 files
+                    st.text(f"  {file_line}")
+            
+            return True, result.stdout
+        else:
+            # Show detailed error info
+            st.error("❌ Download completed but no data was saved")
+            with st.expander("Show debug output"):
+                st.code(result.stdout)
+            return False, result.stdout
+            
+    except subprocess.CalledProcessError as e:
+        # Parse the error to provide better user feedback
+        error_output = e.stdout + "\n" + e.stderr
+        
+        if "No event found with timestamp matching" in error_output:
+            st.error("❌ No event found with that exact timestamp")
+            st.info("💡 The timestamp might be slightly different. Try browsing events again to see available timestamps.")
+            
+            # Show available timestamps from the error output
+            lines = error_output.split('\n')
+            available_timestamps = []
+            for line in lines:
+                if line.strip().startswith('-') and ('T' in line or 'Z' in line):
+                    available_timestamps.append(line.strip())
+            
+            if available_timestamps:
+                st.write("**Available timestamps:**")
+                for ts in available_timestamps[:5]:
+                    st.text(ts)
+            
+            return False, "Timestamp not found"
+        
+        elif "Failed to fetch Motor Data events" in error_output:
+            st.error("❌ Failed to fetch events from PostHog API")
+            st.info("💡 This might be a temporary API issue. Try again in a moment.")
+            return False, "API fetch failed"
+        
+        else:
+            st.error(f"❌ Error downloading data")
+            with st.expander("Show error details"):
+                st.code(error_output)
+            return False, error_output
+            
+    except Exception as e:
+        st.error(f"❌ Unexpected error: {str(e)}")
+        return False, str(e)
+
+def run_histogram_generation():
+    """Run the histogram generation script"""
+    try:
+        with st.spinner("Generating histograms..."):
+            result = subprocess.run(
+                ["/usr/bin/python3", "-W", "ignore", "scripts/create_histograms.py"], 
+                capture_output=True, text=True, check=True
+            )
+        st.success("✅ Histograms generated successfully!")
+        return True, result.stdout
+    except subprocess.CalledProcessError as e:
+        # Check if it's just a warning issue
+        if "NotOpenSSLWarning" in e.stderr or "urllib3" in e.stderr:
+            st.warning("⚠️ SSL warning encountered, but script may have run successfully. Check the results.")
+            return True, e.stderr
+        else:
+            st.error(f"❌ Error generating histograms: {e.stderr}")
+            return False, e.stderr
 
 def main():
-    """Main application function"""
-    
-    # Debug information
-    st.sidebar.markdown("### 🔧 Debug Info")
-    st.sidebar.text(f"Python: {sys.version[:5]}")
-    st.sidebar.text(f"Streamlit: {st.__version__}")
-    st.sidebar.text(f"Working Dir: {os.getcwd()}")
-    
     # Check authentication first
     if not check_authentication():
         show_login_page()
         return
     
-    # Welcome header
-    st.markdown(f"""
-    <div style="text-align: center; margin-bottom: 2rem;">
-        <h1 style="color: #1f2937;">🚗 Motor Data Analysis Dashboard</h1>
-        <p style="color: #6b7280;">Interactive analysis of PostHog motor data with real-time visualization</p>
+    # Header with user info and logout
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.title("🚗 Motor Data Analysis Dashboard")
+        st.markdown("### Interactive analysis of PostHog motor data with real-time visualization")
+    
+    with col2:
+        st.markdown(f"**👤 Welcome, {st.session_state.username}**")
+        if st.button("🚪 Logout", key="logout_button"):
+            logout()
+    
+    # Sidebar
+    st.sidebar.title("🔧 Control Panel")
+    
+    # User info in sidebar
+    st.sidebar.markdown(f"""
+    <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+        <p style="margin: 0; color: #0c4a6e; font-weight: 600;">
+            👤 Logged in as: <strong>{st.session_state.username}</strong>
+        </p>
     </div>
     """, unsafe_allow_html=True)
     
-    # User info and logout
-    col1, col2 = st.columns([6, 1])
-    with col1:
-        st.markdown(f"**Welcome, {st.session_state.username}!** 👋")
-    with col2:
-        if st.button("🚪 Logout", type="secondary"):
-            logout()
+    # Data Collection Section
+    st.sidebar.header("📥 Data Collection")
     
-    # Simple dashboard content
-    st.markdown("## 📊 Dashboard Content")
-    st.info("🎉 Authentication working! App is running successfully on Streamlit Cloud.")
+    with st.sidebar.expander("Fetch New Data", expanded=True):
+        person_id = st.text_input(
+            "Person ID", 
+            value="0197a976-e0dd-707e-8eef-104d3d3a24a5",
+            help="Enter the PostHog person ID to fetch data for"
+        )
+        
+        if st.button("🔍 Browse Events", use_container_width=True):
+            # Show loading state
+            with st.spinner("🔍 Searching for recent motor data events..."):
+                # Store the person ID in session state and trigger event browsing
+                st.session_state.person_id = person_id
+                st.session_state.show_event_browser = True
+                # Small delay to show the spinner
+                import time
+                time.sleep(0.5)
+            st.rerun()
+        
+        if st.button("📊 Generate Charts", use_container_width=True):
+            success, output = run_histogram_generation()
+            if success:
+                st.rerun()
     
-    # Test basic functionality
-    st.markdown("### 🧪 System Tests")
+    # Clear Data Section
+    with st.sidebar.expander("🗑️ Clear Data", expanded=False):
+        st.markdown("**⚠️ Warning**: This will delete all downloaded data and charts.")
+        
+        # Show what would be cleared
+        csv_files = glob.glob("csv_outputs/*.csv")
+        histogram_files = glob.glob("histogram_outputs/*")
+        total_files = len(csv_files) + len([f for f in histogram_files if os.path.isfile(f)])
+        
+        if total_files > 0:
+            st.info(f"📁 {total_files} files will be deleted")
+            
+            if st.button("🗑️ Clear All Data", use_container_width=True, type="primary"):
+                cleared_files = []
+                
+                # Clear CSV files
+                for file in csv_files:
+                    try:
+                        os.remove(file)
+                        cleared_files.append(os.path.basename(file))
+                    except Exception as e:
+                        st.error(f"Could not delete {file}: {e}")
+                
+                # Clear histogram files
+                for file in histogram_files:
+                    if os.path.isfile(file):
+                        try:
+                            os.remove(file)
+                            cleared_files.append(os.path.basename(file))
+                        except Exception as e:
+                            st.error(f"Could not delete {file}: {e}")
+                
+                if cleared_files:
+                    st.success(f"✅ Cleared {len(cleared_files)} files")
+                    st.rerun()
+        else:
+            st.info("ℹ️ No data files to clear")
     
-    # Test imports
-    try:
-        import requests
-        st.success("✅ Requests module available")
-    except ImportError:
-        st.error("❌ Requests module not available")
+    # Event Browser Interface
+    if hasattr(st.session_state, 'show_event_browser') and st.session_state.show_event_browser:
+        # Modern header with custom styling
+        st.markdown("""
+        <div style="text-align: center; padding: 2rem 0; background: linear-gradient(90deg, #1e40af, #3730a3); border-radius: 1rem; margin-bottom: 2rem;">
+            <h1 style="color: white; margin: 0; font-size: 2.5rem;">🔍 Browse Motor Data Events</h1>
+            <p style="color: #e5e7eb; margin: 0.5rem 0 0 0; font-size: 1.2rem;">Select an event from your recent motor data to download and analyze</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        person_id = st.session_state.get('person_id', '0197a976-e0dd-707e-8eef-104d3d3a24a5')
+        
+        with st.spinner("🔍 Fetching recent events..."):
+            success, output = list_recent_events(person_id)
+        
+        if success:
+            # Parse the event list output
+            events = []
+            lines = output.split('\n')
+            for line in lines:
+                if line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.')) or \
+                   (line.strip().split('.')[0].isdigit() if '.' in line else False):
+                    # Extract event number, timestamp, session ID, and properties count
+                    parts = line.strip().split(' ')
+                    if len(parts) >= 2:
+                        event_num = parts[0].rstrip('.')
+                        timestamp = parts[1] if len(parts) > 1 else "Unknown"
+                        
+                        # Extract session ID from the line
+                        session_id = "Unknown"
+                        properties_count = "Unknown"
+                        
+                        # Look for session ID pattern (Session: xxxxx)
+                        line_text = ' '.join(parts[2:]) if len(parts) > 2 else ""
+                        if "Session:" in line_text:
+                            session_match = line_text.split("Session:")[1].split(",")[0].strip()
+                            session_id = session_match
+                        
+                        # Look for properties count
+                        if "properties)" in line_text:
+                            prop_match = line_text.split("properties)")[0].split(",")[-1].strip()
+                            if prop_match.isdigit():
+                                properties_count = prop_match
+                        
+                        events.append({
+                            'number': event_num,
+                            'timestamp': timestamp,
+                            'session_id': session_id,
+                            'properties_count': properties_count,
+                            'details': line_text
+                        })
+            
+            if events:
+                # Modern success card
+                st.markdown(f"""
+                <div style="background: #dcfce7; border: 1px solid #16a34a; border-radius: 0.75rem; padding: 1rem; margin: 1rem 0;">
+                    <p style="color: #15803d; margin: 0; font-weight: 600;">
+                        ✅ Found {len(events)} recent motor data events
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Create a DataFrame for better display with formatted timestamps
+                events_df = pd.DataFrame([
+                    {
+                        "Event #": event['number'],
+                        "Date & Time (PT)": format_timestamp_readable(event['timestamp']),
+                        "Session ID": event['session_id'][:8] + "..." if len(event['session_id']) > 8 else event['session_id'],
+                        "Properties": event['properties_count'],
+                        "Full Session ID": event['session_id'],  # Hidden column for reference
+                        "Original Timestamp": event['timestamp']  # Hidden column for reference
+                    }
+                    for event in events[:25]  # Show max 25 events
+                ])
+                
+                # Modern section header
+                st.markdown("""
+                <div style="margin: 2rem 0 1rem 0;">
+                    <h2 style="color: #1f2937; border-bottom: 3px solid #3b82f6; padding-bottom: 0.5rem; margin: 0;">
+                        📋 Available Events
+                    </h2>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Display events in a clean, simplified table with better styling
+                display_df = events_df[["Event #", "Date & Time (PT)", "Properties"]]
+                
+                # Custom CSS for the dataframe
+                st.markdown("""
+                <style>
+                .stDataFrame {
+                    border: 1px solid #e5e7eb;
+                    border-radius: 0.75rem;
+                    overflow: hidden;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                st.dataframe(display_df, use_container_width=True, height=350)
+                
+                # Modern section divider
+                st.markdown("""
+                <div style="margin: 2rem 0 1rem 0;">
+                    <h2 style="color: #1f2937; border-bottom: 3px solid #10b981; padding-bottom: 0.5rem; margin: 0;">
+                        🎯 Select Event to Download
+                    </h2>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Enhanced dropdown with better styling
+                event_options = [f"Event {event['number']}: {format_timestamp_readable(event['timestamp'])}" for event in events[:25]]
+                
+                # Create a nice container for the dropdown
+                with st.container():
+                    selected_option = st.selectbox(
+                        "Choose an event:",
+                        options=event_options,
+                        index=0,
+                        help="Select the motor data event you want to analyze",
+                        key="event_selector"
+                    )
+                
+                # Get the selected event index
+                selected_idx = event_options.index(selected_option)
+                selected_event = events[selected_idx]
+                selected_timestamp = selected_event['timestamp']
+                
+                # Modern selected event card with gradient background
+                st.markdown(f"""
+                <div style="
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 1rem;
+                    padding: 1.5rem;
+                    margin: 1.5rem 0;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                ">
+                    <h3 style="color: white; margin: 0 0 0.5rem 0; font-size: 1.25rem;">
+                        📋 Selected Event
+                    </h3>
+                    <div style="
+                        background: rgba(255, 255, 255, 0.2);
+                        border-radius: 0.5rem;
+                        padding: 1rem;
+                        backdrop-filter: blur(10px);
+                    ">
+                        <p style="color: white; margin: 0; font-size: 1.1rem; font-weight: 500;">
+                            <span style="background: rgba(255, 255, 255, 0.3); padding: 0.25rem 0.5rem; border-radius: 0.25rem; margin-right: 0.5rem;">
+                                Event {selected_event['number']}
+                            </span>
+                            {format_timestamp_readable(selected_timestamp)}
+                        </p>
+                        <p style="color: #e5e7eb; margin: 0.5rem 0 0 0; font-size: 0.95rem;">
+                            📊 Contains {selected_event['properties_count']} motor data properties
+                        </p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Modern action buttons with spacing
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                col1, col2, col3 = st.columns([1, 2, 1])
+                
+                with col1:
+                    if st.button("🔙 Back to Dashboard", use_container_width=True, help="Return to main dashboard"):
+                        st.session_state.show_event_browser = False
+                        st.rerun()
+                
+                with col2:
+                    if st.button("📥 Download & Analyze Event", use_container_width=True, type="primary", help="Download this event data and return to dashboard"):
+                        with st.spinner("📥 Downloading motor data..."):
+                            success, output = run_data_collection_with_timestamp(person_id, selected_timestamp)
+                        if success:
+                            st.session_state.show_event_browser = False
+                            st.rerun()
+                
+                with col3:
+                    if st.button("🔄 Refresh", use_container_width=True, help="Refresh the event list"):
+                        st.rerun()
+            else:
+                st.error("❌ No events found in the output")
+                st.code(output)
+                if st.button("🔙 Back to Dashboard"):
+                    st.session_state.show_event_browser = False
+                    st.rerun()
+        else:
+            st.error(f"❌ Failed to fetch events: {output}")
+            if st.button("🔙 Back to Dashboard"):
+                st.session_state.show_event_browser = False
+                st.rerun()
+        
+        return  # Don't show the main dashboard when browsing events
     
-    try:
-        import pandas as pd
-        st.success("✅ Pandas module available")
-    except ImportError:
-        st.error("❌ Pandas module not available")
+    # Load available data
+    csv_data = load_available_data()
+    histogram_data = load_histogram_data()
     
-    # Test file system
-    if os.path.exists("csv_outputs"):
-        st.success("✅ CSV outputs directory exists")
-    else:
-        st.warning("⚠️ CSV outputs directory not found")
+    # Show welcome screen when no data is available
+    if not csv_data and not histogram_data:
+        st.markdown("---")
+        
+        # Welcome message
+        st.markdown("""
+        ### 👋 Welcome to the Motor Data Analysis Dashboard!
+        
+        **Getting Started:**
+        1. 🔍 Click **'Browse Events'** in the sidebar to see recent motor data events
+        2. 📅 Select an event from the list (timestamps are shown in readable format)
+        3. 📥 Click **'Fetch This Event'** to download the data
+        4. 📊 Generate charts and explore your data!
+        
+        **Features:**
+        - 📈 **Interactive Charts** - Dynamic visualizations with Plotly
+        - 📋 **Raw Data Explorer** - Browse and download your data
+        - ⚙️ **Settings** - File management and system information
+        """)
+        
+        # Quick start section
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            #### 🚀 Quick Start
+            
+            Ready to analyze your motor data? Start by browsing available events using the sidebar controls.
+            
+            The system will automatically categorize your data into:
+            - ⚡ **Power** measurements
+            - 🔄 **Torque** readings  
+            - 🌡️ **Temperature** data (Motor & MOSFET)
+            - ❄️ **Cooldown** metrics
+            """)
+        
+        with col2:
+            st.markdown("""
+            #### 📊 What You'll Get
+            
+            Once you've loaded data, you'll see:
+            - **Overview** - Summary statistics and metrics
+            - **Interactive Charts** - Zoomable, filterable visualizations
+            - **Raw Data** - Full data tables with export options
+            - **Settings** - File management and technical details
+            """)
+        
+        # Center the browse events button
+        st.markdown("---")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown("### 🎯 Ready to start?")
+            st.info("Use the **'🔍 Browse Events'** button in the sidebar to get started!")
+        
+        return
     
-    if os.path.exists("scripts/GetPostHog.py"):
-        st.success("✅ GetPostHog script found")
-    else:
-        st.warning("⚠️ GetPostHog script not found")
+    # Main dashboard tabs
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "📈 Interactive Charts", "📋 Raw Data", "⚙️ Settings"])
     
-    # Show environment info
-    st.markdown("### 🌍 Environment")
-    st.text(f"POSTHOG_API_KEY: {'Set' if POSTHOG_API_KEY else 'Not set'}")
-    st.text(f"POSTHOG_PROJECT_ID: {POSTHOG_PROJECT_ID}")
-    st.text(f"Users configured: {len(USERS)}")
+    with tab1:
+        st.header("📊 Data Overview")
+        
+        if csv_data:
+            # Summary metrics
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("📁 Data Categories", len(csv_data))
+            
+            with col2:
+                total_properties = sum(len(df.columns) - 1 for df in csv_data.values())  # -1 for timestamp
+                st.metric("🔧 Total Properties", total_properties)
+            
+            with col3:
+                if histogram_data:
+                    st.metric("📊 Generated Charts", len(histogram_data))
+                else:
+                    st.metric("📊 Generated Charts", 0)
+            
+            with col4:
+                # Show timestamp of latest data
+                latest_timestamp = None
+                for df in csv_data.values():
+                    if 'timestamp' in df.columns and not df.empty:
+                        latest_timestamp = df['timestamp'].iloc[0]
+                        break
+                
+                if latest_timestamp:
+                    st.metric("🕐 Latest Data", latest_timestamp[:16])
+                else:
+                    st.metric("🕐 Latest Data", "Unknown")
+        
+        # Show available data categories
+        st.subheader("Available Data Categories")
+        
+        if csv_data:
+            categories_df = pd.DataFrame([
+                {
+                    "Category": category.replace("_", " ").title(),
+                    "Properties": len(df.columns) - 1,  # -1 for timestamp
+                    "File Size": f"{os.path.getsize(f'csv_outputs/posthog_event_{category}.csv') / 1024:.1f} KB"
+                }
+                for category, df in csv_data.items()
+            ])
+            
+            st.dataframe(categories_df, use_container_width=True)
+        else:
+            st.info("No CSV data available")
+    
+    with tab2:
+        st.header("📈 Interactive Data Visualization")
+        
+        if histogram_data:
+            # Category selector
+            selected_categories = st.multiselect(
+                "Select categories to visualize:",
+                options=list(histogram_data.keys()),
+                default=list(histogram_data.keys())[:2] if len(histogram_data) >= 2 else list(histogram_data.keys()),
+                format_func=lambda x: x.replace("_", " ").title()
+            )
+            
+            if selected_categories:
+                # Display charts
+                for category in selected_categories:
+                    st.subheader(f"{category.replace('_', ' ').title()} Analysis")
+                    
+                    df = histogram_data[category]
+                    
+                    # Create columns for chart and stats
+                    col1, col2 = st.columns([3, 1])
+                    
+                    with col1:
+                        fig = create_interactive_histogram(df, category)
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    with col2:
+                        st.markdown("**📊 Statistics**")
+                        st.metric("Min Value", f"{df['Value'].min():.1f}")
+                        st.metric("Max Value", f"{df['Value'].max():.1f}")
+                        st.metric("Average", f"{df['Value'].mean():.1f}")
+                        st.metric("Properties", len(df))
+                        
+                        # Show min/max properties
+                        min_idx = df['Value'].idxmin()
+                        max_idx = df['Value'].idxmax()
+                        
+                        st.markdown("**🔍 Extremes**")
+                        st.markdown(f"**Min:** Index {df.loc[min_idx, 'Numeric_Label']}")
+                        st.markdown(f"**Max:** Index {df.loc[max_idx, 'Numeric_Label']}")
+                    
+                    st.divider()
+            else:
+                st.info("Select categories to view their visualizations")
+        else:
+            st.warning("⚠️ No histogram data available. Generate charts using the sidebar.")
+            
+            # Show static images if available
+            png_files = glob.glob("histogram_outputs/*.png")
+            if png_files:
+                st.info("📸 Static histogram images found:")
+                for png_file in sorted(png_files):
+                    category = os.path.basename(png_file).replace("_numeric_values.png", "")
+                    st.subheader(f"{category.replace('_', ' ').title()}")
+                    st.image(png_file)
+    
+    with tab3:
+        st.header("📋 Raw Data Exploration")
+        
+        if csv_data:
+            # Category selector for raw data
+            selected_category = st.selectbox(
+                "Select a category to explore:",
+                options=list(csv_data.keys()),
+                format_func=lambda x: x.replace("_", " ").title()
+            )
+            
+            if selected_category:
+                df = csv_data[selected_category]
+                
+                st.subheader(f"Raw Data: {selected_category.replace('_', ' ').title()}")
+                
+                # Show data info
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Rows", len(df))
+                with col2:
+                    st.metric("Columns", len(df.columns))
+                with col3:
+                    if 'timestamp' in df.columns:
+                        st.metric("Timestamp", df['timestamp'].iloc[0] if not df.empty else "N/A")
+                
+                # Display data
+                st.dataframe(df, use_container_width=True)
+                
+                # Download button
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label=f"📥 Download {selected_category}.csv",
+                    data=csv,
+                    file_name=f"{selected_category}_data.csv",
+                    mime="text/csv"
+                )
+        else:
+            st.info("No raw data available")
+    
+    with tab4:
+        st.header("⚙️ Settings & Information")
+        
+        st.subheader("📁 File Information")
+        
+        # Show file structure
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("**CSV Data Files:**")
+            csv_files = glob.glob("csv_outputs/*.csv")
+            if csv_files:
+                for file in sorted(csv_files):
+                    size = os.path.getsize(file) / 1024
+                    st.text(f"📄 {os.path.basename(file)} ({size:.1f} KB)")
+            else:
+                st.text("No CSV files found")
+        
+        with col2:
+            st.markdown("**Histogram Files:**")
+            hist_files = glob.glob("histogram_outputs/*")
+            if hist_files:
+                for file in sorted(hist_files):
+                    if os.path.isfile(file):
+                        size = os.path.getsize(file) / 1024
+                        st.text(f"📊 {os.path.basename(file)} ({size:.1f} KB)")
+            else:
+                st.text("No histogram files found")
+        
+        st.subheader("🔧 System Information")
+        st.text(f"Python Version: {sys.version}")
+        st.text(f"Working Directory: {os.getcwd()}")
+        st.text(f"Streamlit Version: {st.__version__}")
+        
+        st.subheader("📖 About")
+        st.markdown("""
+        **Motor Data Analysis Dashboard**
+        
+        This dashboard provides an interactive interface for analyzing PostHog motor data:
+        
+        - **Data Collection**: Fetch motor data from PostHog API
+        - **Visualization**: Interactive charts and histograms
+        - **Analysis**: Statistical insights and data exploration
+        - **Export**: Download processed data and visualizations
+        
+        Built with Streamlit, Pandas, Matplotlib, and Plotly.
+        """)
 
 if __name__ == "__main__":
     main() 
