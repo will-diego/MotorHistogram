@@ -594,6 +594,71 @@ def main():
         background-color: transparent !important;
     }
     
+    /* AGGRESSIVE: Target any remaining white backgrounds */
+    * {
+        background-color: transparent !important;
+    }
+    
+    /* Restore only the backgrounds we want */
+    .stApp {
+        background-color: #0f172a !important;
+    }
+    
+    [data-testid="metric-container"] {
+        background-color: #1e293b !important;
+    }
+    
+    .stDataFrame table {
+        background-color: #1e293b !important;
+    }
+    
+    .stDataFrame th {
+        background-color: #334155 !important;
+    }
+    
+    .stDataFrame td {
+        background-color: #1e293b !important;
+    }
+    
+    .stButton button {
+        background-color: #3b82f6 !important;
+    }
+    
+    .stSelectbox > div > div {
+        background-color: #334155 !important;
+    }
+    
+    .stTextInput > div > div > input {
+        background-color: #334155 !important;
+    }
+    
+    .streamlit-expanderHeader {
+        background-color: #334155 !important;
+    }
+    
+    .streamlit-expanderContent {
+        background-color: #1e293b !important;
+    }
+    
+    .stSidebar {
+        background-color: #1e293b !important;
+    }
+    
+    /* Force any stubborn containers to dark or transparent */
+    div:not(.stDataFrame):not(.stButton):not(.stSelectbox):not(.stTextInput):not(.streamlit-expanderHeader):not(.streamlit-expanderContent):not(.stSidebar):not([data-testid="metric-container"]) {
+        background-color: transparent !important;
+    }
+    
+    /* Last resort - force common Streamlit containers */
+    [class*="st"], [class*="streamlit"] {
+        background-color: transparent !important;
+    }
+    
+    /* Restore app background */
+    .stApp, .main, .block-container {
+        background-color: #0f172a !important;
+    }
+    
     /* Sidebar dark theme */
     .css-1d391kg, .css-1d391kg p, .stSidebar {
         background-color: #1e293b !important;
