@@ -308,6 +308,10 @@ def fetch_motor_data(person_id, session_id=None):
 def fetch_events_list(person_id):
     """Fetch list of available events for the person"""
     try:
+        # Ensure output directories exist
+        os.makedirs("csv_outputs", exist_ok=True)
+        os.makedirs("histogram_outputs", exist_ok=True)
+        
         # Use sys.executable to ensure same Python environment  
         cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-s", "", "-l"]
         
@@ -343,6 +347,10 @@ def fetch_events_list(person_id):
 def fetch_specific_event_data(person_id, timestamp):
     """Fetch data for a specific event timestamp"""
     try:
+        # Ensure output directories exist
+        os.makedirs("csv_outputs", exist_ok=True)
+        os.makedirs("histogram_outputs", exist_ok=True)
+        
         # Use sys.executable to ensure same Python environment
         cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", timestamp, "-s", ""]
         
