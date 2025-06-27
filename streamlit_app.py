@@ -254,20 +254,29 @@ def parse_events_from_output(output):
     
     for line in lines:
         line = line.strip()
-        # Look for lines that contain timestamp patterns (ISO format)
-        if 'T' in line and 'Z' in line and ('Motor Data' in line or 'Event' in line):
-            # Extract timestamp from the line
+        # Look for numbered event lines like "1. 2025-06-25T21:02:12.715Z (Session: xxxxx, 46 properties)"
+        if line and (line[0].isdigit() and '. ' in line):
+            try:
+                # Split on the first '. ' to separate number from rest
+                parts = line.split('. ', 1)
+                if len(parts) >= 2:
+                    event_text = parts[1]
+                    
+                    # Extract timestamp (ISO format)
+                    import re
+                    timestamp_match = re.search(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?', event_text)
+                    if timestamp_match:
+                        timestamp = timestamp_match.group()
+                        events.append({
+                            'timestamp': timestamp,
+                            'line': line
+                        })
+            except Exception:
+                continue
+        # Alternative format: lines with timestamp patterns directly
+        elif 'T' in line and ('Z' in line or '+' in line):
             import re
-            timestamp_match = re.search(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z', line)
-            if timestamp_match:
-                timestamp = timestamp_match.group()
-                events.append({
-                    'timestamp': timestamp,
-                    'line': line
-                })
-        elif line.startswith('-') and ('T' in line and 'Z' in line):
-            # Alternative format: lines starting with dash
-            timestamp_match = re.search(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z', line)
+            timestamp_match = re.search(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:\d{2})', line)
             if timestamp_match:
                 timestamp = timestamp_match.group()
                 events.append({
@@ -305,11 +314,27 @@ def fetch_events_list(person_id):
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
         
         if result.returncode == 0:
+            # Debug: Show what we got from the script
+            st.info(f"🔧 Debug - Script output length: {len(result.stdout)} characters")
+            if len(result.stdout) > 0:
+                # Show first few lines for debugging
+                lines = result.stdout.split('\n')[:10]
+                st.info(f"🔧 Debug - First 10 lines of output:")
+                for i, line in enumerate(lines):
+                    if line.strip():
+                        st.code(f"Line {i+1}: {line}")
+            
             # Parse the output to extract events
             events = parse_events_from_output(result.stdout)
+            st.info(f"🔧 Debug - Parsed {len(events)} events from output")
+            
             return True, events
         else:
-            st.error(f"Failed to fetch events: {result.stderr}")
+            st.error(f"Failed to fetch events (exit code {result.returncode})")
+            if result.stderr:
+                st.error(f"Error details: {result.stderr}")
+            if result.stdout:
+                st.info(f"Script output: {result.stdout}")
             return False, []
     except Exception as e:
         st.error(f"Failed to fetch events: {str(e)}")
