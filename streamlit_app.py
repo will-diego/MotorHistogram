@@ -492,129 +492,260 @@ def main():
         show_login_page()
         return
     
-    # Add global CSS for better contrast and readability
+    # Add global CSS for dark theme with white text
     st.markdown("""
     <style>
-    /* Improve overall text contrast and readability */
+    /* Dark theme - overall app background */
     .stApp {
-        background-color: #ffffff;
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
     }
     
-    /* Fix text contrast issues */
-    .stMarkdown, .stText, p, span, div {
-        color: #1f2937 !important;
+    /* Main content area */
+    .main .block-container {
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
     }
     
-    /* Fix tab text visibility */
+    /* Fix all text to white */
+    .stMarkdown, .stText, p, span, div, label {
+        color: #f8fafc !important;
+    }
+    
+    /* Tab styling - dark theme */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #1e293b !important;
+        border-bottom: 2px solid #475569 !important;
+    }
+    
+    .stTabs [data-baseweb="tab-list"] button {
+        background-color: #334155 !important;
+        color: #cbd5e1 !important;
+        border: 1px solid #475569 !important;
+        border-radius: 0.5rem 0.5rem 0 0 !important;
+        margin-right: 0.25rem !important;
+    }
+    
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+        background-color: #0f172a !important;
+        color: #ffffff !important;
+        border-bottom: 2px solid #3b82f6 !important;
+    }
+    
     .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        color: #374151 !important;
+        color: #cbd5e1 !important;
         font-weight: 600 !important;
     }
     
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] [data-testid="stMarkdownContainer"] p {
-        color: #1f2937 !important;
+        color: #ffffff !important;
         font-weight: 700 !important;
     }
     
-    /* Fix sidebar text */
-    .css-1d391kg, .css-1d391kg p {
-        color: #1f2937 !important;
+    /* Tab content area */
+    .stTabs [data-baseweb="tab-panel"] {
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+        padding: 1rem !important;
     }
     
-    /* Fix metric values */
+    /* Sidebar dark theme */
+    .css-1d391kg, .css-1d391kg p, .stSidebar {
+        background-color: #1e293b !important;
+        color: #f8fafc !important;
+    }
+    
+    .stSidebar .stMarkdown {
+        color: #f8fafc !important;
+    }
+    
+    /* Metric containers - dark theme */
     [data-testid="metric-container"] {
-        background-color: #f9fafb;
-        border: 1px solid #e5e7eb;
-        padding: 1rem;
-        border-radius: 0.5rem;
+        background-color: #1e293b !important;
+        border: 1px solid #475569 !important;
+        padding: 1rem !important;
+        border-radius: 0.5rem !important;
+        color: #f8fafc !important;
     }
     
     [data-testid="metric-container"] > div {
-        color: #1f2937 !important;
+        color: #f8fafc !important;
     }
     
-    /* Fix dataframe styling */
-    .stDataFrame {
-        border: 2px solid #374151 !important;
-        border-radius: 0.5rem !important;
-    }
-    
-    .stDataFrame table {
-        background-color: #ffffff !important;
-    }
-    
-    .stDataFrame th {
-        background-color: #f3f4f6 !important;
-        color: #1f2937 !important;
-        font-weight: 600 !important;
-        border-bottom: 2px solid #374151 !important;
-    }
-    
-    .stDataFrame td {
-        color: #374151 !important;
-        border-bottom: 1px solid #e5e7eb !important;
-    }
-    
-    /* Fix button text */
-    .stButton button {
+    [data-testid="metric-container"] [data-testid="stMetricValue"] {
         color: #ffffff !important;
-        font-weight: 600 !important;
-    }
-    
-    /* Fix selectbox */
-    .stSelectbox > div > div {
-        color: #1f2937 !important;
-    }
-    
-    /* Fix expander headers */
-    .streamlit-expanderHeader {
-        color: #1f2937 !important;
-        font-weight: 600 !important;
-    }
-    
-    /* Fix info/success/error messages */
-    .stAlert {
-        border-radius: 0.5rem !important;
-    }
-    
-    .stSuccess {
-        background-color: #dcfce7 !important;
-        color: #166534 !important;
-        border: 1px solid #16a34a !important;
-    }
-    
-    .stError {
-        background-color: #fef2f2 !important;
-        color: #dc2626 !important;
-        border: 1px solid #ef4444 !important;
-    }
-    
-    .stInfo {
-        background-color: #dbeafe !important;
-        color: #1d4ed8 !important;
-        border: 1px solid #3b82f6 !important;
-    }
-    
-    .stWarning {
-        background-color: #fef3c7 !important;
-        color: #d97706 !important;
-        border: 1px solid #f59e0b !important;
-    }
-    
-    /* Fix spinner text */
-    .stSpinner > div {
-        color: #1f2937 !important;
-    }
-    
-    /* Headers and subheaders */
-    h1, h2, h3, h4, h5, h6 {
-        color: #1f2937 !important;
+        font-size: 1.5rem !important;
         font-weight: 700 !important;
     }
     
-    /* Fix any remaining dark text on dark background */
+    [data-testid="metric-container"] [data-testid="stMetricLabel"] {
+        color: #cbd5e1 !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Dark dataframe styling */
+    .stDataFrame {
+        border: 2px solid #475569 !important;
+        border-radius: 0.5rem !important;
+        background-color: #1e293b !important;
+    }
+    
+    .stDataFrame table {
+        background-color: #1e293b !important;
+        color: #f8fafc !important;
+    }
+    
+    .stDataFrame th {
+        background-color: #334155 !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        border-bottom: 2px solid #475569 !important;
+    }
+    
+    .stDataFrame td {
+        color: #f8fafc !important;
+        border-bottom: 1px solid #475569 !important;
+        background-color: #1e293b !important;
+    }
+    
+    .stDataFrame tr:hover td {
+        background-color: #334155 !important;
+    }
+    
+    /* Button styling - dark theme */
+    .stButton button {
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        border: none !important;
+        border-radius: 0.5rem !important;
+    }
+    
+    .stButton button:hover {
+        background-color: #2563eb !important;
+    }
+    
+    /* Primary button (different color) */
+    .stButton button[kind="primary"] {
+        background-color: #10b981 !important;
+    }
+    
+    .stButton button[kind="primary"]:hover {
+        background-color: #059669 !important;
+    }
+    
+    /* Form elements - dark theme */
+    .stSelectbox > div > div {
+        background-color: #334155 !important;
+        color: #f8fafc !important;
+        border: 1px solid #475569 !important;
+    }
+    
+    .stTextInput > div > div > input {
+        background-color: #334155 !important;
+        color: #f8fafc !important;
+        border: 1px solid #475569 !important;
+    }
+    
+    /* Expander styling - dark theme */
+    .streamlit-expanderHeader {
+        background-color: #334155 !important;
+        color: #f8fafc !important;
+        font-weight: 600 !important;
+        border: 1px solid #475569 !important;
+        border-radius: 0.5rem !important;
+    }
+    
+    .streamlit-expanderContent {
+        background-color: #1e293b !important;
+        border: 1px solid #475569 !important;
+        border-top: none !important;
+        border-radius: 0 0 0.5rem 0.5rem !important;
+    }
+    
+    /* Alert messages - dark theme versions */
+    .stAlert {
+        border-radius: 0.5rem !important;
+        border: 1px solid !important;
+    }
+    
+    .stSuccess {
+        background-color: #064e3b !important;
+        color: #10b981 !important;
+        border-color: #10b981 !important;
+    }
+    
+    .stError {
+        background-color: #7f1d1d !important;
+        color: #ef4444 !important;
+        border-color: #ef4444 !important;
+    }
+    
+    .stInfo {
+        background-color: #1e3a8a !important;
+        color: #3b82f6 !important;
+        border-color: #3b82f6 !important;
+    }
+    
+    .stWarning {
+        background-color: #92400e !important;
+        color: #f59e0b !important;
+        border-color: #f59e0b !important;
+    }
+    
+    /* Spinner styling */
+    .stSpinner > div {
+        color: #f8fafc !important;
+    }
+    
+    /* Headers - bright white for contrast */
+    h1, h2, h3, h4, h5, h6 {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+    }
+    
+    /* Code blocks - dark theme */
+    .stCode {
+        background-color: #334155 !important;
+        color: #f8fafc !important;
+        border: 1px solid #475569 !important;
+    }
+    
+    /* Custom card styling for gradient cards */
+    .custom-card {
+        background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%) !important;
+        border-radius: 1rem !important;
+        padding: 1.5rem !important;
+        margin: 1rem 0 !important;
+        border: 1px solid #475569 !important;
+    }
+    
+    /* Fix any remaining light backgrounds */
     .css-1v0mbdj, .css-1v0mbdj p {
-        color: #1f2937 !important;
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+    }
+    
+    /* Login page styling */
+    .login-container {
+        background-color: #1e293b !important;
+        border: 1px solid #475569 !important;
+        border-radius: 1rem !important;
+    }
+    
+    /* Progress bars */
+    .stProgress > div > div {
+        background-color: #3b82f6 !important;
+    }
+    
+    /* Markdown containers */
+    [data-testid="stMarkdownContainer"] {
+        color: #f8fafc !important;
+    }
+    
+    /* Column containers */
+    [data-testid="column"] {
+        background-color: transparent !important;
     }
     </style>
     """, unsafe_allow_html=True)
