@@ -247,6 +247,58 @@ def create_interactive_histogram(df, category):
     
     return fig
 
+def fetch_motor_data(person_id, session_id=None):
+    """Fetch motor data from PostHog for the given person ID"""
+    try:
+        # Use sys.executable to ensure same Python environment
+        cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id]
+        
+        if session_id and session_id.strip():
+            cmd.extend(["-s", session_id.strip()])
+        
+        # Run the command
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
+        
+        if result.returncode == 0:
+            return True, "Data fetched successfully!"
+        else:
+            return False, f"Error: {result.stderr}"
+    except Exception as e:
+        return False, f"Failed to fetch data: {str(e)}"
+
+def fetch_events_list(person_id):
+    """Fetch list of available events for the person"""
+    try:
+        # Use sys.executable to ensure same Python environment  
+        cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-s", "", "-l"]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
+        
+        if result.returncode == 0:
+            # Parse the output to extract events
+            return parse_events_from_output(result.stdout)
+        else:
+            st.error(f"Failed to fetch events: {result.stderr}")
+            return []
+    except Exception as e:
+        st.error(f"Failed to fetch events: {str(e)}")
+        return []
+
+def fetch_specific_event_data(person_id, timestamp):
+    """Fetch data for a specific event timestamp"""
+    try:
+        # Use sys.executable to ensure same Python environment
+        cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", timestamp, "-s", ""]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
+        
+        if result.returncode == 0:
+            return True, "Event data fetched successfully!"
+        else:
+            return False, f"Error: {result.stderr}"
+    except Exception as e:
+        return False, f"Failed to fetch event data: {str(e)}"
+
 def run_data_collection(person_id, session_id=None, timestamp=None):
     """Run the data collection script"""
     cmd = ["/usr/bin/python3", "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id]
@@ -312,83 +364,6 @@ def run_data_collection(person_id, session_id=None, timestamp=None):
             return True, e.stderr
         else:
             return False, e.stderr
-
-def list_recent_events(person_id, limit=25):
-    """List recent Motor Data events for a person"""
-    # Don't use session filtering when browsing - we want to see ALL events for this person
-    cmd = ["/usr/bin/python3", "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-s", "", "-l"]
-    
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        return True, result.stdout
-    except subprocess.CalledProcessError as e:
-        return False, e.stderr
-
-def run_data_collection_with_timestamp(person_id, timestamp):
-    """Run data collection for a specific timestamp"""
-    # Don't pass session ID when fetching specific timestamp - let it find the event regardless of session
-    cmd = ["/usr/bin/python3", "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", timestamp, "-s", ""]
-    
-    try:
-        with st.spinner(f"Downloading data for {format_timestamp_readable(timestamp)}..."):
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        
-        # Check if successful by looking for success indicators in output
-        if "successfully fetched" in result.stdout.lower() or "saved to" in result.stdout.lower():
-            st.success("✅ Data downloaded successfully!")
-            
-            # Show a summary of what was downloaded
-            lines = result.stdout.split('\n')
-            saved_files = [line for line in lines if 'saved to' in line.lower()]
-            if saved_files:
-                st.info(f"📁 Files created: {len(saved_files)}")
-                for file_line in saved_files[:3]:  # Show first 3 files
-                    st.text(f"  {file_line}")
-            
-            return True, result.stdout
-        else:
-            # Show detailed error info
-            st.error("❌ Download completed but no data was saved")
-            with st.expander("Show debug output"):
-                st.code(result.stdout)
-            return False, result.stdout
-            
-    except subprocess.CalledProcessError as e:
-        # Parse the error to provide better user feedback
-        error_output = e.stdout + "\n" + e.stderr
-        
-        if "No event found with timestamp matching" in error_output:
-            st.error("❌ No event found with that exact timestamp")
-            st.info("💡 The timestamp might be slightly different. Try browsing events again to see available timestamps.")
-            
-            # Show available timestamps from the error output
-            lines = error_output.split('\n')
-            available_timestamps = []
-            for line in lines:
-                if line.strip().startswith('-') and ('T' in line or 'Z' in line):
-                    available_timestamps.append(line.strip())
-            
-            if available_timestamps:
-                st.write("**Available timestamps:**")
-                for ts in available_timestamps[:5]:
-                    st.text(ts)
-            
-            return False, "Timestamp not found"
-        
-        elif "Failed to fetch Motor Data events" in error_output:
-            st.error("❌ Failed to fetch events from PostHog API")
-            st.info("💡 This might be a temporary API issue. Try again in a moment.")
-            return False, "API fetch failed"
-        
-        else:
-            st.error(f"❌ Error downloading data")
-            with st.expander("Show error details"):
-                st.code(error_output)
-            return False, error_output
-            
-    except Exception as e:
-        st.error(f"❌ Unexpected error: {str(e)}")
-        return False, str(e)
 
 def run_histogram_generation():
     """Run the histogram generation script"""
@@ -515,7 +490,7 @@ def main():
         person_id = st.session_state.get('person_id', '0197a976-e0dd-707e-8eef-104d3d3a24a5')
         
         with st.spinner("🔍 Fetching recent events..."):
-            success, output = list_recent_events(person_id)
+            success, output = fetch_events_list(person_id)
         
         if success:
             # Parse the event list output
@@ -673,7 +648,7 @@ def main():
                 with col2:
                     if st.button("📥 Download & Analyze Event", use_container_width=True, type="primary", help="Download this event data and return to dashboard"):
                         with st.spinner("📥 Downloading motor data..."):
-                            success, output = run_data_collection_with_timestamp(person_id, selected_timestamp)
+                            success, output = fetch_specific_event_data(person_id, selected_timestamp)
                         if success:
                             st.session_state.show_event_browser = False
                             st.rerun()
