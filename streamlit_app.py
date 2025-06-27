@@ -265,10 +265,21 @@ def parse_events_from_output(output):
                     # Extract timestamp (ISO format)
                     import re
                     timestamp_match = re.search(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?', event_text)
+                    
+                    # Extract session ID from (Session: xxxxx, properties)
+                    session_match = re.search(r'Session:\s*([^,)]+)', event_text)
+                    session_id = session_match.group(1).strip() if session_match else "Unknown"
+                    
+                    # Extract property count from ", XX properties)"
+                    properties_match = re.search(r'(\d+)\s+properties', event_text)
+                    properties_count = properties_match.group(1) if properties_match else "Unknown"
+                    
                     if timestamp_match:
                         timestamp = timestamp_match.group()
                         events.append({
                             'timestamp': timestamp,
+                            'session_id': session_id,
+                            'properties_count': properties_count,
                             'line': line
                         })
             except Exception:
@@ -281,6 +292,8 @@ def parse_events_from_output(output):
                 timestamp = timestamp_match.group()
                 events.append({
                     'timestamp': timestamp,
+                    'session_id': "Unknown",
+                    'properties_count': "Unknown",
                     'line': line
                 })
     
@@ -588,8 +601,8 @@ def main():
                 formatted_events.append({
                     'number': str(i),
                     'timestamp': event['timestamp'],
-                    'session_id': "Unknown",  # Will need to extract from event data if available
-                    'properties_count': "Unknown",  # Will need to count properties if available
+                    'session_id': event['session_id'],
+                    'properties_count': event['properties_count'],
                     'details': event.get('line', '')
                 })
             
