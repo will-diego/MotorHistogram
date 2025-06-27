@@ -53,32 +53,28 @@ def main():
             'title': 'Motor Power',
             'xlabel': 'Power Index',
             'ylabel': 'Power Values',
-            'range': (25, 800),  # Expected range: 25-800
-            'filter_zeros': True
+            'range': (25, 800)  # Expected range: 25-800
         },
         'torque': {
             'patterns': [r'torque\d+', r'torqueHigh', r'torqueLow'], 
             'title': 'Motor Torque',
             'xlabel': 'Torque Index', 
             'ylabel': 'Torque Values',
-            'range': (2, 90),  # Expected range: 2-90
-            'filter_zeros': True
+            'range': (2, 90)  # Expected range: 2-90
         },
         'motor_temp': {
             'patterns': [r'motor.*temp', r'Motor\.Temperature', r'motortemperature'],
             'title': 'Motor Temperature',
             'xlabel': 'Temperature Index',
             'ylabel': 'Temperature (°C)',
-            'range': (10, 200),  # Expected range: 10-200°C
-            'filter_zeros': False
+            'range': (10, 200)  # Expected range: 10-200°C
         },
         'mosfet_temp': {
             'patterns': [r'mosfet.*temp', r'MOSFET\.Temperature', r'mosfettemperature'],
             'title': 'MOSFET Temperature', 
             'xlabel': 'Temperature Index',
             'ylabel': 'Temperature (°C)',
-            'range': (10, 200),  # Expected range: 10-200°C
-            'filter_zeros': False
+            'range': (10, 200)  # Expected range: 10-200°C
         }
     }
     
@@ -121,10 +117,7 @@ def main():
                 if np.isnan(numeric_value):
                     continue
                 
-                # Skip zero values for torque and power (they aren't meaningful motor activity)
-                if (category_name == 'power' or category_name == 'torque') and numeric_value == 0:
-                    print(f"   🚫 Skipping zero value for {col} (zeros not shown for {category_name})")
-                    continue
+                # Don't skip any values - show all including zeros for reference
                 
                 # Validate value is within expected range
                 min_val, max_val = category_info.get('range', (0, float('inf')))
@@ -148,7 +141,7 @@ def main():
         if not chart_data:
             print(f"   ❌ No valid numeric data found for {category_name}")
             min_val, max_val = category_info.get('range', (0, float('inf')))
-            print(f"   💡 Expected range: {min_val}-{max_val}, Zero filtering: {category_info.get('filter_zeros', False)}")
+            print(f"   💡 Expected range: {min_val}-{max_val}, Shows all values including zeros")
             continue
         
         # Sort by index
@@ -183,17 +176,23 @@ def main():
 def extract_numeric_index(column_name, category):
     """Extract numeric index from column name based on category"""
     
-    # For torque: usually 2-digit suffixes (00, 25, 50, etc.)
+    # For torque: usually 2-digit suffixes (00, 25, 50, etc.) - skip index 0
     if 'torque' in category:
         match = re.search(r'(\d{2})$', column_name)
         if match:
-            return int(match.group(1))
+            index = int(match.group(1))
+            if index == 0:
+                return None  # Skip index 0 for torque
+            return index
     
-    # For power: usually 3-digit suffixes (000, 025, 050, etc.)
+    # For power: usually 3-digit suffixes (000, 025, 050, etc.) - skip index 0
     elif 'power' in category:
         match = re.search(r'(\d{3})$', column_name)
         if match:
-            return int(match.group(1))
+            index = int(match.group(1))
+            if index == 0:
+                return None  # Skip index 0 for power
+            return index
         # Handle special cases like powerHigh, powerLow
         elif 'high' in column_name.lower():
             return 999  # Put at end
