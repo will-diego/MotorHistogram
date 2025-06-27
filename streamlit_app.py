@@ -446,6 +446,66 @@ def run_histogram_generation():
             st.error(f"❌ Error generating histograms: {e.stderr}")
             return False, e.stderr
 
+def fetch_bulk_events(person_id, event_count=None):
+    """Fetch multiple events and combine them into a single dataset"""
+    try:
+        # Ensure output directories exist
+        os.makedirs("csv_outputs", exist_ok=True)
+        os.makedirs("histogram_outputs", exist_ok=True)
+        
+        # First get the list of events
+        cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-s", "", "-l"]
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".", timeout=120)
+        
+        if result.returncode != 0:
+            return False, f"Failed to fetch event list: {result.stderr or 'Unknown error'}"
+        
+        # Parse events 
+        events = parse_events_from_output(result.stdout)
+        if not events:
+            return False, "No events found"
+        
+        if event_count:
+            # Take only the requested number of recent events
+            selected_events = events[:event_count]
+            action_text = f"last {event_count}"
+        else:
+            # Take all events
+            selected_events = events
+            action_text = f"all {len(events)}"
+        
+        # Download each event
+        success_count = 0
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for i, event in enumerate(selected_events):
+            progress = (i + 1) / len(selected_events)
+            progress_bar.progress(progress)
+            status_text.text(f"Downloading event {i+1}/{len(selected_events)}: {event['timestamp'][:16]}...")
+            
+            # Download individual event
+            event_cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", event['timestamp'], "-s", ""]
+            event_result = subprocess.run(event_cmd, capture_output=True, text=True, cwd=".", timeout=60)
+            
+            if event_result.returncode == 0:
+                success_count += 1
+        
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        
+        if success_count > 0:
+            st.success(f"✅ Successfully downloaded {success_count}/{len(selected_events)} events! Data has been combined in CSV files.")
+            return True, f"Downloaded {action_text} events successfully ({success_count}/{len(selected_events)} succeeded)"
+        else:
+            return False, "Failed to download any events"
+    
+    except subprocess.TimeoutExpired:
+        return False, "Bulk download timed out (operation exceeded 2 minutes)"
+    except Exception as e:
+        return False, f"Failed to fetch bulk events: {str(e)}"
+
 def main():
     # Check authentication first
     if not check_authentication():
@@ -722,6 +782,73 @@ def main():
                     if 'event_page' in st.session_state:
                         del st.session_state.event_page  # Reset pagination
                     st.rerun()
+            
+            # Bulk download section
+            st.markdown("---")
+            st.markdown("### 📦 Bulk Downloads")
+            st.markdown("*Download multiple events at once for comprehensive analysis*")
+            
+            col1, col2, col3 = st.columns([1, 1, 1])
+            
+            with col1:
+                if st.button("📥 Get Last 5 Events", use_container_width=True, type="secondary", 
+                           help="Download and combine the 5 most recent events into datasets"):
+                    with st.spinner("📥 Downloading last 5 events..."):
+                        success, output = fetch_bulk_events(person_id, event_count=5)
+                    
+                    if success:
+                        st.session_state.show_event_browser = False
+                        if 'event_page' in st.session_state:
+                            del st.session_state.event_page  # Reset pagination
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Bulk download failed: {output}")
+                        st.info("💡 Try refreshing the list or downloading individual events.")
+            
+            with col2:
+                if st.button("📥 Get All Events", use_container_width=True, type="secondary",
+                           help="Download all available events (may take several minutes)"):
+                    # Show confirmation dialog
+                    if 'confirm_all_events' not in st.session_state:
+                        st.session_state.confirm_all_events = True
+                        st.warning("⚠️ This will download ALL available events and may take several minutes. Click again to confirm.")
+                    else:
+                        del st.session_state.confirm_all_events
+                        with st.spinner("📥 Downloading all events... This may take several minutes..."):
+                            success, output = fetch_bulk_events(person_id, event_count=None)
+                        
+                        if success:
+                            st.session_state.show_event_browser = False
+                            if 'event_page' in st.session_state:
+                                del st.session_state.event_page  # Reset pagination
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Bulk download failed: {output}")
+                            st.info("💡 Try downloading fewer events or check your connection.")
+            
+            with col3:
+                if len(formatted_events) > 5:
+                    if st.button(f"📥 Get Current Page ({len(current_events)} events)", use_container_width=True, type="secondary",
+                               help=f"Download all {len(current_events)} events from the current page"):
+                        with st.spinner(f"📥 Downloading {len(current_events)} events from current page..."):
+                            # Download events from current page
+                            success_count = 0
+                            for event in current_events:
+                                event_success, _ = fetch_specific_event_data(person_id, event['timestamp'])
+                                if event_success:
+                                    success_count += 1
+                        
+                        if success_count > 0:
+                            st.success(f"✅ Downloaded {success_count}/{len(current_events)} events from current page!")
+                            st.session_state.show_event_browser = False
+                            if 'event_page' in st.session_state:
+                                del st.session_state.event_page  # Reset pagination
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to download any events from current page")
+                else:
+                    st.button("📥 Current Page", disabled=True, use_container_width=True, 
+                            help="Not enough events on current page for bulk download")
 
         else:
             st.error("❌ No events found in the output")
