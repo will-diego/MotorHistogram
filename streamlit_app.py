@@ -629,14 +629,33 @@ def main():
             end_idx = min(start_idx + events_per_page, total_events)
             current_events = formatted_events[start_idx:end_idx]
             
-            # Modern success card with pagination info
-            st.markdown(f"""
-            <div style="background: #dcfce7; border: 1px solid #16a34a; border-radius: 0.75rem; padding: 1rem; margin: 1rem 0;">
-                <p style="color: #15803d; margin: 0; font-weight: 600;">
-                    ✅ Found {total_events} recent motor data events (Page {current_page + 1} of {total_pages})
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
+            # Pagination controls at the top
+            st.markdown("### 📄 Page Navigation")
+            
+            col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
+            
+            with col1:
+                if st.button("⏮️ First", disabled=(current_page == 0), key="first_page_top"):
+                    st.session_state.event_page = 0
+                    st.rerun()
+            
+            with col2:
+                if st.button("◀️ Previous", disabled=(current_page == 0), key="prev_page_top"):
+                    st.session_state.event_page = max(0, current_page - 1)
+                    st.rerun()
+            
+            with col3:
+                st.markdown(f"**Page {current_page + 1} of {total_pages}** (Events {start_idx + 1}-{end_idx} of {total_events})")
+            
+            with col4:
+                if st.button("Next ▶️", disabled=(current_page >= total_pages - 1), key="next_page_top"):
+                    st.session_state.event_page = min(total_pages - 1, current_page + 1)
+                    st.rerun()
+            
+            with col5:
+                if st.button("Last ⏭️", disabled=(current_page >= total_pages - 1), key="last_page_top"):
+                    st.session_state.event_page = total_pages - 1
+                    st.rerun()
             
             # Modern section header
             st.markdown("""
@@ -703,35 +722,7 @@ def main():
                     if 'event_page' in st.session_state:
                         del st.session_state.event_page  # Reset pagination
                     st.rerun()
-            
-            # Pagination controls
-            st.markdown("---")
-            st.markdown("### 📄 Page Navigation")
-            
-            col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
-            
-            with col1:
-                if st.button("⏮️ First", disabled=(current_page == 0), key="first_page"):
-                    st.session_state.event_page = 0
-                    st.rerun()
-            
-            with col2:
-                if st.button("◀️ Previous", disabled=(current_page == 0), key="prev_page"):
-                    st.session_state.event_page = max(0, current_page - 1)
-                    st.rerun()
-            
-            with col3:
-                st.markdown(f"**Page {current_page + 1} of {total_pages}** (Events {start_idx + 1}-{end_idx} of {total_events})")
-            
-            with col4:
-                if st.button("Next ▶️", disabled=(current_page >= total_pages - 1), key="next_page"):
-                    st.session_state.event_page = min(total_pages - 1, current_page + 1)
-                    st.rerun()
-            
-            with col5:
-                if st.button("Last ⏭️", disabled=(current_page >= total_pages - 1), key="last_page"):
-                    st.session_state.event_page = total_pages - 1
-                    st.rerun()
+
         else:
             st.error("❌ No events found in the output")
             if st.button("🔙 Back to Dashboard"):
