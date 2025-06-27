@@ -566,7 +566,7 @@ def main():
         
         with st.expander("Fetch New Data", expanded=False):
             st.text("Person ID")
-            person_id = st.text_input("", value="0197a976-e0dd-707e-9c85-a734005b1f85", label_visibility="collapsed")
+            person_id = st.text_input("", value="0197a976-e0dd-707e-8eef-104d3d3a24a5", label_visibility="collapsed")
             
             if st.button("🔍 Browse Events"):
                 # Show loading state
