@@ -272,7 +272,7 @@ def parse_events_from_output(output):
                     
                     # Extract property count from ", XX properties)"
                     properties_match = re.search(r'(\d+)\s+properties', event_text)
-                    properties_count = properties_match.group(1) if properties_match else "Unknown"
+                    properties_count = int(properties_match.group(1)) if properties_match else 0
                     
                     if timestamp_match:
                         timestamp = timestamp_match.group()
@@ -293,7 +293,7 @@ def parse_events_from_output(output):
                 events.append({
                     'timestamp': timestamp,
                     'session_id': "Unknown",
-                    'properties_count': "Unknown",
+                    'properties_count': 0,
                     'line': line
                 })
     
@@ -596,7 +596,7 @@ def main():
         
         with st.expander("Fetch New Data", expanded=False):
             st.text("Person ID")
-            person_id = st.text_input("", value="0197a976-e0dd-707e-8eef-104d3d3a24a5", label_visibility="collapsed")
+            person_id = st.text_input("Person ID", value="0197a976-e0dd-707e-8eef-104d3d3a24a5", label_visibility="collapsed")
             
             if st.button("🔍 Browse Events"):
                 # Show loading state
