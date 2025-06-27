@@ -492,12 +492,139 @@ def main():
         show_login_page()
         return
     
+    # Add global CSS for better contrast and readability
+    st.markdown("""
+    <style>
+    /* Improve overall text contrast and readability */
+    .stApp {
+        background-color: #ffffff;
+    }
+    
+    /* Fix text contrast issues */
+    .stMarkdown, .stText, p, span, div {
+        color: #1f2937 !important;
+    }
+    
+    /* Fix tab text visibility */
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        color: #374151 !important;
+        font-weight: 600 !important;
+    }
+    
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] [data-testid="stMarkdownContainer"] p {
+        color: #1f2937 !important;
+        font-weight: 700 !important;
+    }
+    
+    /* Fix sidebar text */
+    .css-1d391kg, .css-1d391kg p {
+        color: #1f2937 !important;
+    }
+    
+    /* Fix metric values */
+    [data-testid="metric-container"] {
+        background-color: #f9fafb;
+        border: 1px solid #e5e7eb;
+        padding: 1rem;
+        border-radius: 0.5rem;
+    }
+    
+    [data-testid="metric-container"] > div {
+        color: #1f2937 !important;
+    }
+    
+    /* Fix dataframe styling */
+    .stDataFrame {
+        border: 2px solid #374151 !important;
+        border-radius: 0.5rem !important;
+    }
+    
+    .stDataFrame table {
+        background-color: #ffffff !important;
+    }
+    
+    .stDataFrame th {
+        background-color: #f3f4f6 !important;
+        color: #1f2937 !important;
+        font-weight: 600 !important;
+        border-bottom: 2px solid #374151 !important;
+    }
+    
+    .stDataFrame td {
+        color: #374151 !important;
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+    
+    /* Fix button text */
+    .stButton button {
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Fix selectbox */
+    .stSelectbox > div > div {
+        color: #1f2937 !important;
+    }
+    
+    /* Fix expander headers */
+    .streamlit-expanderHeader {
+        color: #1f2937 !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Fix info/success/error messages */
+    .stAlert {
+        border-radius: 0.5rem !important;
+    }
+    
+    .stSuccess {
+        background-color: #dcfce7 !important;
+        color: #166534 !important;
+        border: 1px solid #16a34a !important;
+    }
+    
+    .stError {
+        background-color: #fef2f2 !important;
+        color: #dc2626 !important;
+        border: 1px solid #ef4444 !important;
+    }
+    
+    .stInfo {
+        background-color: #dbeafe !important;
+        color: #1d4ed8 !important;
+        border: 1px solid #3b82f6 !important;
+    }
+    
+    .stWarning {
+        background-color: #fef3c7 !important;
+        color: #d97706 !important;
+        border: 1px solid #f59e0b !important;
+    }
+    
+    /* Fix spinner text */
+    .stSpinner > div {
+        color: #1f2937 !important;
+    }
+    
+    /* Headers and subheaders */
+    h1, h2, h3, h4, h5, h6 {
+        color: #1f2937 !important;
+        font-weight: 700 !important;
+    }
+    
+    /* Fix any remaining dark text on dark background */
+    .css-1v0mbdj, .css-1v0mbdj p {
+        color: #1f2937 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     # Header with user info and logout
     col1, col2 = st.columns([3, 1])
     with col1:
         st.title("🚗 Motor Data Analysis Dashboard")
         st.markdown("### Interactive analysis of PostHog motor data with real-time visualization")
-    
+
     with col2:
         st.markdown(f"**👤 Welcome, {st.session_state.username}**")
         if st.button("🚪 Logout", key="logout_button"):
