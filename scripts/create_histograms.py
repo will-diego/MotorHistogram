@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Simple histogram generator for motor data - shows complete ranges without smart editing
+Sums all values across all events for each index
 """
 
 import os
@@ -19,7 +20,7 @@ def main():
     # Create output directory
     Path(OUTPUT_DIR).mkdir(exist_ok=True)
     
-    print("📊 Creating histograms from master CSV...")
+    print("📊 Creating histograms from master CSV (summing all events)...")
     
     # Check master CSV
     if not os.path.exists(MASTER_CSV):
@@ -32,34 +33,32 @@ def main():
         print("❌ Master CSV is empty")
         return False
     
-    # Use latest row
-    latest_row = df.iloc[-1]
-    print(f"📅 Using data from: {latest_row.get('timestamp', 'Unknown')}")
+    print(f"📅 Processing {len(df)} events from master CSV")
     
     # Define exact ranges - NO SMART EDITING
     categories = {
         'power': {
             'range': list(range(25, 901, 25)),  # 25, 50, 75... 900
-            'title': 'Motor Power Distribution',
-            'ylabel': 'Power Values',
+            'title': 'Motor Power Distribution (Sum of All Events)',
+            'ylabel': 'Total Power Values',
             'pattern': r'power(\d+)'
         },
         'torque': {
             'range': list(range(2, 91, 2)),     # 2, 4, 6... 90
-            'title': 'Motor Torque Distribution', 
-            'ylabel': 'Torque Values',
+            'title': 'Motor Torque Distribution (Sum of All Events)', 
+            'ylabel': 'Total Torque Values',
             'pattern': r'torque(\d+)'
         },
         'motor_temp': {
             'range': list(range(10, 201, 10)),  # 10, 20, 30... 200
-            'title': 'Motor Temperature Distribution',
-            'ylabel': 'Temperature (°C)',
+            'title': 'Motor Temperature Distribution (Sum of All Events)',
+            'ylabel': 'Total Temperature (°C)',
             'pattern': r'motor.*temp.*(\d+)'
         },
         'mosfet_temp': {
             'range': list(range(10, 201, 10)), # 10, 20, 30... 200
-            'title': 'MOSFET Temperature Distribution',
-            'ylabel': 'Temperature (°C)', 
+            'title': 'MOSFET Temperature Distribution (Sum of All Events)',
+            'ylabel': 'Total Temperature (°C)', 
             'pattern': r'mosfet.*temp.*(\d+)'
         }
     }
@@ -70,54 +69,48 @@ def main():
     for category_name, config in categories.items():
         print(f"\n🔍 Processing {category_name}...")
         
-        # Find matching columns
+        # Find matching columns and sum all values
         matching_data = {}
         for col in df.columns:
             if col == 'timestamp':
                 continue
                 
-            # Check if column matches pattern
+            # Check if column matches pattern and extract index
+            index = None
             if category_name == 'power' and 'power' in col.lower():
                 match = re.search(r'(\d+)', col)
                 if match:
                     index = int(match.group(1))
-                    if index in config['range']:
-                        value = latest_row[col]
-                        if pd.notna(value):
-                            matching_data[index] = float(value)
             
             elif category_name == 'torque' and 'torque' in col.lower():
                 match = re.search(r'(\d+)', col)
                 if match:
                     index = int(match.group(1))
-                    if index in config['range']:
-                        value = latest_row[col]
-                        if pd.notna(value):
-                            matching_data[index] = float(value)
             
             elif category_name == 'motor_temp' and ('motor' in col.lower() and 'temp' in col.lower()):
                 match = re.search(r'(\d+)', col)
                 if match:
                     index = int(match.group(1))
-                    if index in config['range']:
-                        value = latest_row[col]
-                        if pd.notna(value):
-                            matching_data[index] = float(value)
             
             elif category_name == 'mosfet_temp' and ('mosfet' in col.lower() and 'temp' in col.lower()):
                 match = re.search(r'(\d+)', col)
                 if match:
                     index = int(match.group(1))
-                    if index in config['range']:
-                        value = latest_row[col]
-                        if pd.notna(value):
-                            matching_data[index] = float(value)
+            
+            # If we found a valid index and it's in our range, sum all values
+            if index is not None and index in config['range']:
+                # Sum all non-null values in this column across all rows
+                column_sum = df[col].fillna(0).sum()
+                if column_sum > 0:  # Only include if there's actual data
+                    matching_data[index] = column_sum
         
         # Create complete range with zeros for missing values
         full_range = config['range']
         full_values = [matching_data.get(idx, 0) for idx in full_range]
         
         print(f"   ✅ Found data for {len(matching_data)} indices out of {len(full_range)} total")
+        total_sum = sum(matching_data.values())
+        print(f"   📊 Total sum across all events: {total_sum:.1f}")
         
         # Create chart
         if create_simple_chart(full_range, full_values, category_name, config, OUTPUT_DIR, FIGURE_SIZE):
