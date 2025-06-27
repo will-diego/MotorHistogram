@@ -113,6 +113,10 @@ def main():
                 if np.isnan(numeric_value):
                     continue
                 
+                # Skip zero values for torque and power (they clutter the charts)
+                if ('torque' in category_name or 'power' in category_name) and numeric_value == 0:
+                    continue
+                
                 # Extract numeric index from column name
                 numeric_index = extract_numeric_index(col, category_name)
                 if numeric_index is not None:
@@ -225,9 +229,9 @@ def create_chart(chart_data, category_name, category_info, output_dir, figure_si
         # Color bars with gradient
         if len(values) > 1:
             # Normalize values for coloring
-                         norm_values = np.array(values)
-             norm_values = (norm_values - norm_values.min()) / (norm_values.max() - norm_values.min() + 1e-8)
-             colors = plt.cm.get_cmap('viridis')(norm_values)
+            norm_values = np.array(values)
+            norm_values = (norm_values - norm_values.min()) / (norm_values.max() - norm_values.min() + 1e-8)
+            colors = plt.cm.get_cmap('viridis')(norm_values)
             for bar, color in zip(bars, colors):
                 bar.set_facecolor(color)
         
