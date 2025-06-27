@@ -121,8 +121,9 @@ def main():
                 if np.isnan(numeric_value):
                     continue
                 
-                # Skip zero values for categories that have filter_zeros enabled
-                if category_info.get('filter_zeros', False) and numeric_value == 0:
+                # Skip zero values for torque and power (they aren't meaningful motor activity)
+                if (category_name == 'power' or category_name == 'torque') and numeric_value == 0:
+                    print(f"   🚫 Skipping zero value for {col} (zeros not shown for {category_name})")
                     continue
                 
                 # Validate value is within expected range
@@ -153,24 +154,8 @@ def main():
         # Sort by index
         chart_data.sort(key=lambda x: x['index'])
         
-        # Remove statistical outliers for cleaner charts
-        if len(chart_data) > 5:
-            values = [item['value'] for item in chart_data]
-            mean_val = np.mean(values)
-            std_val = np.std(values)
-            
-            # Remove values that are more than 3 standard deviations from mean
-            filtered_data = []
-            outliers_removed = 0
-            for item in chart_data:
-                if abs(item['value'] - mean_val) <= 3 * std_val:
-                    filtered_data.append(item)
-                else:
-                    outliers_removed += 1
-            
-            if outliers_removed > 0:
-                chart_data = filtered_data
-                print(f"   🧹 Removed {outliers_removed} statistical outliers")
+        # Don't remove any values - show full x-axis range
+        # Keep all data points for complete picture
         
         if not chart_data:
             print(f"   ❌ No data remaining after cleaning for {category_name}")
