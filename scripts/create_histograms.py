@@ -1,242 +1,296 @@
+#!/usr/bin/env python3
+"""
+Modern histogram generator for master CSV motor data
+Works with the new master CSV format where all motor data is in one file
+"""
+
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import os
-import glob
-from pathlib import Path
 import re
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import numpy as np
+from pathlib import Path
 
-# === CONFIG ===
-MASTER_CSV = "csv_outputs/motor_data_master.csv"
-OUTPUT_DIR = "histogram_outputs"
-FIGURE_SIZE = (14, 8)
-
-# Create output directory if it doesn't exist
-Path(OUTPUT_DIR).mkdir(exist_ok=True)
-
-print("📊 Creating property value bar charts from master motor data...")
-
-# Check if master CSV exists
-if not os.path.exists(MASTER_CSV):
-    print(f"❌ Master CSV file not found: {MASTER_CSV}")
-    exit(1)
-
-print(f"✅ Found master CSV file: {MASTER_CSV}")
-
-try:
-    # Read master CSV file
-    df = pd.read_csv(MASTER_CSV)
-    print(f"📊 Loaded {len(df)} rows from master CSV")
+def main():
+    # Configuration
+    MASTER_CSV = "csv_outputs/motor_data_master.csv"
+    OUTPUT_DIR = "histogram_outputs"
+    FIGURE_SIZE = (12, 8)
     
-    if len(df) == 0:
-        print("❌ Master CSV file is empty")
-        exit(1)
+    # Create output directory
+    Path(OUTPUT_DIR).mkdir(exist_ok=True)
     
-    # Define motor data categories
+    print("🚀 Starting modern histogram generation from master CSV...")
+    
+    # Check if master CSV exists
+    if not os.path.exists(MASTER_CSV):
+        print(f"❌ Master CSV not found: {MASTER_CSV}")
+        print("💡 Make sure to download some motor data first!")
+        return False
+    
+    # Load master CSV
+    try:
+        df = pd.read_csv(MASTER_CSV)
+        print(f"✅ Loaded master CSV with {len(df)} rows and {len(df.columns)} columns")
+        
+        if df.empty:
+            print("❌ Master CSV is empty")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error reading master CSV: {e}")
+        return False
+    
+    # Use the most recent row (last row)
+    latest_row = df.iloc[-1]
+    timestamp = latest_row.get('timestamp', 'Unknown')
+    print(f"📅 Using data from: {timestamp}")
+    
+    # Define motor data categories with their column patterns
     categories = {
-        'power': ['Motor.Power', 'motorpower'],
-        'torque': ['Motor.Torque', 'motortorque'],
-        'motor_temp': ['Motor.Temperature', 'motortemperature'],
-        'mosfet_temp': ['MOSFET.Temperature', 'mosfettemperature'], 
-        'motor_cooldown': ['Motor.Cooldown', 'motorcooldown'],
-        'mosfet_cooldown': ['MOSFET.Cooldown', 'mosfetcooldown']
+        'power': {
+            'patterns': [r'power\d+', r'powerHigh', r'powerLow'],
+            'title': 'Motor Power',
+            'xlabel': 'Power Index',
+            'ylabel': 'Power Values'
+        },
+        'torque': {
+            'patterns': [r'torque\d+', r'torqueHigh', r'torqueLow'], 
+            'title': 'Motor Torque',
+            'xlabel': 'Torque Index', 
+            'ylabel': 'Torque Values'
+        },
+        'motor_temp': {
+            'patterns': [r'motor.*temp', r'Motor\.Temperature', r'motortemperature'],
+            'title': 'Motor Temperature',
+            'xlabel': 'Temperature Index',
+            'ylabel': 'Temperature (°C)'
+        },
+        'mosfet_temp': {
+            'patterns': [r'mosfet.*temp', r'MOSFET\.Temperature', r'mosfettemperature'],
+            'title': 'MOSFET Temperature', 
+            'xlabel': 'Temperature Index',
+            'ylabel': 'Temperature (°C)'
+        }
     }
     
+    charts_created = 0
+    
     # Process each category
-    for category, keywords in categories.items():
-        print(f"\n🔍 Processing category: {category}")
+    for category_name, category_info in categories.items():
+        print(f"\n🔍 Processing {category_name}...")
         
-        # Skip cooldown files for now
-        if 'cooldown' in category:
-            print(f"   ⏭️  Skipping cooldown category: {category}")
-            continue
-        
-        # Find columns that match this category
-        category_columns = []
+        # Find columns matching this category
+        matching_columns = []
         for col in df.columns:
-            if col != 'timestamp':
-                col_lower = col.lower()
-                if any(keyword.lower() in col_lower for keyword in keywords):
-                    category_columns.append(col)
+            if col == 'timestamp':
+                continue
+                
+            # Check if column matches any pattern for this category
+            col_lower = col.lower()
+            for pattern in category_info['patterns']:
+                if re.search(pattern.lower(), col_lower):
+                    matching_columns.append(col)
+                    break
         
-        if not category_columns:
-            print(f"   ❌ No columns found for category: {category}")
+        if not matching_columns:
+            print(f"   ⚠️ No columns found for {category_name}")
             continue
+            
+        print(f"   ✅ Found {len(matching_columns)} columns: {matching_columns[:5]}{'...' if len(matching_columns) > 5 else ''}")
         
-        print(f"   ✅ Found {len(category_columns)} columns for {category}")
-        
-        # Use the most recent row (last row) for values
-        latest_row = df.iloc[-1]
-        
-        # Get property names and their values
-        property_data = []
-        
-        for col in category_columns:
+        # Extract numeric data from matching columns
+        chart_data = []
+        for col in matching_columns:
             try:
                 value = latest_row[col]
                 
-                # Try to convert to numeric
-                try:
-                    numeric_value = float(value)
-                    if not np.isnan(numeric_value):
-                        # Extract numeric suffix from property name
-                        if 'torque' in col.lower():
-                            # For torque, extract last 2 digits
-                            match = re.search(r'(\d{2})$', col)
-                            if match:
-                                numeric_label = int(match.group(1))
-                                property_data.append((numeric_label, numeric_value, col))
-                        else:
-                            # For temp/power, extract last 3 digits or handle special .Low properties
-                            match = re.search(r'(\d{3})$', col)
-                            if match:
-                                numeric_label = int(match.group(1))
-                                property_data.append((numeric_label, numeric_value, col))
-                            elif col.lower().endswith('.low') and ('temp' in category):
-                                # Special case for temperature .Low properties (values < 20)
-                                numeric_label = -1  # Put at the beginning (before 020, 030, etc.)
-                                property_data.append((numeric_label, numeric_value, col))
-                                print(f"   ✅ Including temperature .Low property: {col}")
-                            else:
-                                print(f"   ⚠️  Could not extract numeric suffix from: {col}")
-                except (ValueError, TypeError):
-                    print(f"   ⚠️  Skipping non-numeric property: {col} = {value}")
+                # Convert to numeric
+                if pd.isna(value):
                     continue
                     
-            except Exception as e:
-                print(f"   ⚠️  Error processing column {col}: {e}")
+                numeric_value = float(value)
+                if np.isnan(numeric_value):
+                    continue
+                
+                # Extract numeric index from column name
+                numeric_index = extract_numeric_index(col, category_name)
+                if numeric_index is not None:
+                    chart_data.append({
+                        'index': numeric_index,
+                        'value': numeric_value,
+                        'column': col
+                    })
+                    
+            except (ValueError, TypeError) as e:
+                print(f"   ⚠️ Skipping {col}: {e}")
                 continue
         
-        if not property_data:
-            print(f"   ❌ No valid properties found for category: {category}")
+        if not chart_data:
+            print(f"   ❌ No valid numeric data found for {category_name}")
             continue
-            
-        # Sort by numeric label to get correct order
-        property_data.sort(key=lambda x: x[0])
         
-        # For torque and power, remove the lowest index (the first big bar)
-        if ('torque' in category or 'power' in category) and len(property_data) > 1:
-            property_data = property_data[1:]  # Remove the first (lowest) index
+        # Sort by index
+        chart_data.sort(key=lambda x: x['index'])
         
-        # Extract sorted data
-        numeric_labels = [item[0] for item in property_data]
-        property_values = [item[1] for item in property_data]
-        property_names = [item[2] for item in property_data]
+        # Remove outliers for cleaner charts (optional)
+        if len(chart_data) > 5:
+            # Remove first element if it's much larger than others (common issue)
+            values = [item['value'] for item in chart_data]
+            if values[0] > np.mean(values[1:]) * 3:
+                chart_data = chart_data[1:]
+                print(f"   🧹 Removed outlier: {values[0]}")
         
-        print(f"   📈 Creating bar chart for {len(property_data)} properties")
+        if not chart_data:
+            print(f"   ❌ No data remaining after cleaning for {category_name}")
+            continue
         
-        # Create single figure
-        fig, ax = plt.subplots(1, 1, figsize=FIGURE_SIZE)
+        # Create the chart
+        success = create_chart(chart_data, category_name, category_info, OUTPUT_DIR, FIGURE_SIZE)
+        if success:
+            charts_created += 1
+            print(f"   ✅ Created chart for {category_name}")
+        else:
+            print(f"   ❌ Failed to create chart for {category_name}")
+    
+    print(f"\n🎉 Histogram generation complete!")
+    print(f"📊 Created {charts_created} charts in '{OUTPUT_DIR}' directory")
+    
+    if charts_created == 0:
+        print("💡 No charts were created. This might be because:")
+        print("   - Column names don't match expected patterns")
+        print("   - Data values are invalid or missing")
+        print("   - Try downloading fresh data")
+    
+    return charts_created > 0
+
+def extract_numeric_index(column_name, category):
+    """Extract numeric index from column name based on category"""
+    
+    # For torque: usually 2-digit suffixes (00, 25, 50, etc.)
+    if 'torque' in category:
+        match = re.search(r'(\d{2})$', column_name)
+        if match:
+            return int(match.group(1))
+    
+    # For power: usually 3-digit suffixes (000, 025, 050, etc.)
+    elif 'power' in category:
+        match = re.search(r'(\d{3})$', column_name)
+        if match:
+            return int(match.group(1))
+        # Handle special cases like powerHigh, powerLow
+        elif 'high' in column_name.lower():
+            return 999  # Put at end
+        elif 'low' in column_name.lower():
+            return -1   # Put at beginning
+    
+    # For temperature: various patterns
+    elif 'temp' in category:
+        # Try 3-digit pattern first
+        match = re.search(r'(\d{3})$', column_name)
+        if match:
+            return int(match.group(1))
+        # Try 2-digit pattern
+        match = re.search(r'(\d{2})$', column_name)
+        if match:
+            return int(match.group(1))
+        # Special temperature cases
+        elif 'low' in column_name.lower():
+            return -1
+        elif 'high' in column_name.lower():
+            return 999
+    
+    # Fallback: try to find any number in the column name
+    numbers = re.findall(r'\d+', column_name)
+    if numbers:
+        return int(numbers[-1])  # Use last number found
+    
+    return None
+
+def create_chart(chart_data, category_name, category_info, output_dir, figure_size):
+    """Create and save a chart for the given category data"""
+    
+    try:
+        # Extract data for plotting
+        indices = [item['index'] for item in chart_data]
+        values = [item['value'] for item in chart_data]
+        columns = [item['column'] for item in chart_data]
+        
+        # Create the figure
+        fig, ax = plt.subplots(1, 1, figsize=figure_size)
         
         # Create bar chart
-        x_positions = range(len(numeric_labels))
-        bars = ax.bar(x_positions, property_values, alpha=0.8, edgecolor='black', linewidth=0.5)
+        bars = ax.bar(range(len(indices)), values, alpha=0.8, edgecolor='black', linewidth=0.5)
         
-        # Customize the plot
-        category_title = category.replace("_", " ").title()
-        ax.set_title(f'{category_title} - Values by Numeric Index', fontsize=16, fontweight='bold', pad=20)
-        if 'torque' in category:
-            ax.set_xlabel('Torque Index (Last 2 Digits)', fontsize=14, fontweight='bold')
-        else:
-            ax.set_xlabel('Index (Last 3 Digits)', fontsize=14, fontweight='bold')
-        ax.set_ylabel('Values', fontsize=14, fontweight='bold')
-        ax.grid(True, alpha=0.3, axis='y')
-        
-        # Set x-axis labels to show numeric labels (handle special .Low properties)
-        ax.set_xticks(x_positions)
-        if 'torque' in category:
-            # For torque, show as 2-digit format
-            ax.set_xticklabels([f'{label:02d}' for label in numeric_labels], rotation=0, fontsize=10)
-        else:
-            # For temp/power, show as 3-digit format, but handle .Low as special case
-            x_labels = []
-            for label in numeric_labels:
-                if label == -1:
-                    x_labels.append('Low')
-                else:
-                    x_labels.append(f'{label:03d}')
-            ax.set_xticklabels(x_labels, rotation=45, ha='right', fontsize=10)
-        
-        # Color bars with a gradient based on value
-        if len(property_values) > 1:
-            # Normalize values for color mapping
-            min_val = min(property_values)
-            max_val = max(property_values)
-            if max_val > min_val:
-                normalized_values = [(val - min_val) / (max_val - min_val) for val in property_values]
-            else:
-                normalized_values = [0.5] * len(property_values)
-            
-            colors = plt.cm.get_cmap('viridis')(normalized_values)
+        # Color bars with gradient
+        if len(values) > 1:
+            # Normalize values for coloring
+                         norm_values = np.array(values)
+             norm_values = (norm_values - norm_values.min()) / (norm_values.max() - norm_values.min() + 1e-8)
+             colors = plt.cm.get_cmap('viridis')(norm_values)
             for bar, color in zip(bars, colors):
                 bar.set_facecolor(color)
+        
+        # Customize the chart
+        ax.set_title(f'{category_info["title"]} - Value Distribution', fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel(category_info['xlabel'], fontsize=12, fontweight='bold')
+        ax.set_ylabel(category_info['ylabel'], fontsize=12, fontweight='bold')
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # Set x-axis labels
+        ax.set_xticks(range(len(indices)))
+        if 'torque' in category_name:
+            labels = [f'{idx:02d}' for idx in indices]
         else:
-            bars[0].set_facecolor(plt.cm.get_cmap('viridis')(0.5))
+            labels = []
+            for idx in indices:
+                if idx == -1:
+                    labels.append('Low')
+                elif idx == 999:
+                    labels.append('High')
+                else:
+                    labels.append(f'{idx:03d}')
         
-        # Add value labels on top of bars
-        max_value = max(property_values) if property_values else 0
-        for i, (bar, value) in enumerate(zip(bars, property_values)):
+        ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=10)
+        
+        # Add value labels on bars
+        for bar, value in zip(bars, values):
             height = bar.get_height()
-            # Show value on top of bar
-            ax.text(bar.get_x() + bar.get_width()/2., height + max_value*0.01,
-                   f'{value:.0f}', ha='center', va='bottom', fontsize=8)
+            ax.text(bar.get_x() + bar.get_width()/2., height + max(values)*0.01,
+                   f'{value:.0f}', ha='center', va='bottom', fontsize=9)
         
-        # Add statistics text box
-        stats_text = f'Properties: {len(property_data)}\n'
-        stats_text += f'Min Value: {min(property_values):.0f}\n'
-        stats_text += f'Max Value: {max(property_values):.0f}\n'
-        stats_text += f'Average: {sum(property_values)/len(property_values):.1f}\n'
+        # Add statistics box
+        stats_text = f'Properties: {len(chart_data)}\n'
+        stats_text += f'Min: {min(values):.1f}\n'
+        stats_text += f'Max: {max(values):.1f}\n'
+        stats_text += f'Avg: {np.mean(values):.1f}\n'
+        stats_text += f'Sum: {sum(values):.1f}'
         
-        # Find properties with min and max values
-        min_idx = property_values.index(min(property_values))
-        max_idx = property_values.index(max(property_values))
-        stats_text += f'Min: {numeric_labels[min_idx]}\n'
-        stats_text += f'Max: {numeric_labels[max_idx]}'
-        
-        ax.text(0.98, 0.98, stats_text, transform=ax.transAxes, 
-               bbox=dict(boxstyle='round,pad=0.8', facecolor='white', alpha=0.9, edgecolor='gray'),
+        ax.text(0.98, 0.98, stats_text, transform=ax.transAxes,
+               bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.9),
                verticalalignment='top', horizontalalignment='right', fontsize=10,
                fontfamily='monospace')
         
-        # Adjust layout
+        # Adjust layout and save
         plt.tight_layout()
         
-        # Save the plot
-        output_file = f"{OUTPUT_DIR}/{category}_numeric_values.png"
-        plt.savefig(output_file, dpi=300, bbox_inches='tight')
-        print(f"   ✅ Saved bar chart: {output_file}")
+        # Save PNG
+        png_file = os.path.join(output_dir, f'{category_name}_chart.png')
+        plt.savefig(png_file, dpi=300, bbox_inches='tight')
         
-        # Create detailed property values file
-        values_file = f"{OUTPUT_DIR}/{category}_numeric_values.csv"
+        # Save CSV data
+        csv_file = os.path.join(output_dir, f'{category_name}_numeric_values.csv')
+        chart_df = pd.DataFrame(chart_data)
+        chart_df = chart_df.rename(columns={'index': 'Numeric_Label', 'value': 'Value', 'column': 'Original_Property'})
+        chart_df.to_csv(csv_file, index=False)
         
-        # Create property values DataFrame
-        values_df = pd.DataFrame({
-            'Numeric_Label': numeric_labels,
-            'Value': property_values,
-            'Original_Property': property_names
-        })
-        values_df.to_csv(values_file, index=False)
-        print(f"   📊 Saved property values: {values_file}")
+        plt.close()
+        return True
         
-        plt.close()  # Close to free memory
+    except Exception as e:
+        print(f"   ❌ Error creating chart for {category_name}: {e}")
+        return False
 
-except Exception as e:
-    print(f"❌ Error processing master CSV: {str(e)}")
-    exit(1)
-
-print(f"\n🎉 Numeric indexed bar chart generation complete!")
-print(f"📁 Check the '{OUTPUT_DIR}' folder for your numeric indexed bar charts")
-print(f"🔍 Generated files:")
-
-# List generated files
-chart_files = glob.glob(f"{OUTPUT_DIR}/*_numeric_values.png")
-data_files = glob.glob(f"{OUTPUT_DIR}/*_numeric_values.csv")
-
-for file in sorted(chart_files + data_files):
-    file_size = os.path.getsize(file) / 1024  # Size in KB
-    print(f"   📄 {file} ({file_size:.1f} KB)") 
+if __name__ == "__main__":
+    success = main()
+    exit(0 if success else 1) 
