@@ -346,13 +346,32 @@ def fetch_specific_event_data(person_id, timestamp):
         # Use sys.executable to ensure same Python environment
         cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", timestamp, "-s", ""]
         
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
+        st.info(f"🔧 Debug - Downloading event: {timestamp}")
+        st.info(f"🔧 Debug - Command: {' '.join(cmd)}")
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=".", timeout=60)
+        
+        st.info(f"🔧 Debug - Exit code: {result.returncode}")
+        if result.stdout:
+            st.info(f"🔧 Debug - Output length: {len(result.stdout)} characters")
+        if result.stderr:
+            st.info(f"🔧 Debug - Error output: {result.stderr[:200]}...")
         
         if result.returncode == 0:
+            st.success("✅ Event data downloaded successfully!")
             return True, "Event data fetched successfully!"
         else:
-            return False, f"Error: {result.stderr}"
+            st.error(f"❌ Failed to download event data (exit code: {result.returncode})")
+            if result.stderr:
+                st.error(f"Error details: {result.stderr}")
+            if result.stdout:
+                st.info(f"Script output: {result.stdout}")
+            return False, f"Error: {result.stderr or 'Unknown error'}"
+    except subprocess.TimeoutExpired:
+        st.error("⏰ Download timed out after 60 seconds")
+        return False, "Download timed out"
     except Exception as e:
+        st.error(f"❌ Failed to fetch event data: {str(e)}")
         return False, f"Failed to fetch event data: {str(e)}"
 
 def run_data_collection(person_id, session_id=None, timestamp=None):
@@ -679,9 +698,13 @@ def main():
                 if st.button("📥 Download & Analyze Event", use_container_width=True, type="primary", help="Download this event data and return to dashboard"):
                     with st.spinner("📥 Downloading motor data..."):
                         success, output = fetch_specific_event_data(person_id, selected_timestamp)
+                    
                     if success:
                         st.session_state.show_event_browser = False
                         st.rerun()
+                    else:
+                        st.error(f"❌ Download failed: {output}")
+                        st.info("💡 Try selecting a different event or refresh the list.")
             
             with col3:
                 if st.button("🔄 Refresh", use_container_width=True, help="Refresh the event list"):
