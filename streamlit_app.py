@@ -469,25 +469,25 @@ def fetch_bulk_events(person_id, event_count=None):
         if not events:
             return False, "No events found"
         
-        # Filter events to only include those with 160+ properties (quality control)
-        quality_events = [event for event in events if event['properties_count'] >= 160]
+        # Filter events to only include those with 160-170 properties (quality control)
+        quality_events = [event for event in events if 160 <= event['properties_count'] <= 170]
         
         if not quality_events:
-            return False, f"No high-quality events found (need 160+ properties). Found {len(events)} events but all had fewer than 160 properties."
+            return False, f"No high-quality events found (need 160-170 properties). Found {len(events)} events but none were in the optimal range."
         
         if event_count:
             # Take only the requested number of recent quality events
             selected_events = quality_events[:event_count]
             action_text = f"last {event_count} quality"
             # Show filtering info specific to the requested count
-            st.info(f"🔍 Quality filter: Selected {len(selected_events)} quality events from {len(quality_events)} available events with 160+ properties")
+            st.info(f"🔍 Quality filter: Selected {len(selected_events)} quality events from {len(quality_events)} available events with 160-170 properties")
         else:
             # Take all quality events
             selected_events = quality_events
             action_text = f"all {len(quality_events)} quality"
             # Show filtering info for all events
             if len(quality_events) < len(events):
-                st.info(f"🔍 Quality filter: Using {len(quality_events)} events with 160+ properties (filtered out {len(events) - len(quality_events)} low-quality events)")
+                st.info(f"🔍 Quality filter: Using {len(quality_events)} events with 160-170 properties (filtered out {len(events) - len(quality_events)} events outside optimal range)")
         
         # Initialize combined data structures with timestamps
         all_events_data = []
@@ -901,13 +901,13 @@ def main():
             # Bulk download section
             st.markdown("---")
             st.markdown("### 📦 Bulk Downloads")
-            st.markdown("*Download multiple events at once for comprehensive analysis (160+ properties only)*")
+            st.markdown("*Download multiple events at once for comprehensive analysis (160-170 properties only)*")
             
             col1, col2, col3 = st.columns([1, 1, 1])
             
             with col1:
                 if st.button("📥 Get Last 5 Quality Events", use_container_width=True, type="secondary", 
-                           help="Download and combine the 5 most recent events with 160+ properties"):
+                           help="Download and combine the 5 most recent events with 160-170 properties"):
                     with st.spinner("📥 Downloading last 5 quality events..."):
                         success, output = fetch_bulk_events(person_id, event_count=5)
                     
@@ -922,11 +922,11 @@ def main():
             
             with col2:
                 if st.button("📥 Get All Quality Events", use_container_width=True, type="secondary",
-                           help="Download all available quality events with 160+ properties (may take several minutes)"):
+                           help="Download all available quality events with 160-170 properties (may take several minutes)"):
                     # Show confirmation dialog
                     if 'confirm_all_events' not in st.session_state:
                         st.session_state.confirm_all_events = True
-                        st.warning("⚠️ This will download ALL quality events (160+ properties) and may take several minutes. Click again to confirm.")
+                        st.warning("⚠️ This will download ALL quality events (160-170 properties) and may take several minutes. Click again to confirm.")
                     else:
                         del st.session_state.confirm_all_events
                         with st.spinner("📥 Downloading all quality events... This may take several minutes..."):
