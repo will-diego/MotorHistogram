@@ -211,8 +211,20 @@ def load_available_data():
 def load_histogram_data():
     """Load histogram data files"""
     data = {}
-    csv_pattern = "histogram_outputs/*_numeric_values.csv"
-    csv_files = glob.glob(csv_pattern)
+    
+    # Try multiple patterns to find histogram CSV files
+    patterns = [
+        "histogram_outputs/*_numeric_values.csv",
+        "./histogram_outputs/*_numeric_values.csv",
+        os.path.join(os.getcwd(), "histogram_outputs", "*_numeric_values.csv")
+    ]
+    
+    csv_files = []
+    for pattern in patterns:
+        files = glob.glob(pattern)
+        if files:
+            csv_files = files
+            break
     
     # Only load if files exist and have content
     for file_path in csv_files:
@@ -230,7 +242,8 @@ def load_histogram_data():
             category = filename.replace("_numeric_values.csv", "")
             data[category] = df
         except Exception as e:
-            st.warning(f"Could not load {file_path}: {e}")
+            # Only show warning if we're in debug mode (remove for production)
+            pass
     
     return data
 
@@ -1126,16 +1139,33 @@ def main():
             else:
                 st.info("Select categories to view their visualizations")
         else:
-            st.warning("⚠️ No histogram data available. Generate charts using the sidebar.")
+            st.warning("⚠️ No interactive histogram data available. Generate charts using the sidebar.")
             
-            # Show static images if available
-            png_files = glob.glob("histogram_outputs/*.png")
+            # Show static images if available as fallback
+            png_patterns = [
+                "histogram_outputs/*.png",
+                "./histogram_outputs/*.png",
+                os.path.join(os.getcwd(), "histogram_outputs", "*.png")
+            ]
+            
+            png_files = []
+            for pattern in png_patterns:
+                files = glob.glob(pattern)
+                if files:
+                    png_files = files
+                    break
+            
             if png_files:
                 st.info("📸 Static histogram images found:")
                 for png_file in sorted(png_files):
                     category = os.path.basename(png_file).replace("_numeric_values.png", "")
                     st.subheader(f"{category.replace('_', ' ').title()}")
-                    st.image(png_file)
+                    try:
+                        st.image(png_file)
+                    except Exception as e:
+                        st.error(f"Could not load image: {png_file}")
+            else:
+                st.info("🔧 No charts found. Click 'Generate Charts' in the sidebar to create visualizations.")
     
     with tab3:
         st.header("📋 Raw Data Exploration")
