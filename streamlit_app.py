@@ -384,7 +384,8 @@ def fetch_specific_event_data(person_id, timestamp):
 
 def run_data_collection(person_id, session_id=None, timestamp=None):
     """Run the data collection script"""
-    cmd = ["/usr/bin/python3", "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id]
+    # Use sys.executable to ensure same Python environment
+    cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id]
     
     if session_id:
         cmd.extend(["-s", session_id])
@@ -451,9 +452,14 @@ def run_data_collection(person_id, session_id=None, timestamp=None):
 def run_histogram_generation():
     """Run the histogram generation script"""
     try:
+        # Ensure output directories exist
+        os.makedirs("csv_outputs", exist_ok=True)
+        os.makedirs("histogram_outputs", exist_ok=True)
+        
         with st.spinner("Generating histograms..."):
+            # Use sys.executable to ensure same Python environment
             result = subprocess.run(
-                ["/usr/bin/python3", "-W", "ignore", "scripts/create_histograms.py"], 
+                [sys.executable, "-W", "ignore", "scripts/create_histograms.py"], 
                 capture_output=True, text=True, check=True
             )
         st.success("✅ Histograms generated successfully!")
