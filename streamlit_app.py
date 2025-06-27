@@ -700,7 +700,7 @@ def main():
             </style>
             """, unsafe_allow_html=True)
             
-            st.dataframe(display_df, use_container_width=True, height=min(350, len(current_events) * 35 + 100))
+            st.dataframe(display_df, use_container_width=True, height=min(350, len(current_events) * 35 + 100), hide_index=True)
             
             # Modern section divider
             st.markdown("""
@@ -884,7 +884,7 @@ def main():
                 for category, df in csv_data.items()
             ])
             
-            st.dataframe(categories_df, use_container_width=True)
+            st.dataframe(categories_df, use_container_width=True, hide_index=True)
         else:
             st.info("No CSV data available")
     
@@ -977,7 +977,7 @@ def main():
                         st.markdown("**N/A**")
                 
                 # Display data
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(df, use_container_width=True, hide_index=True)
                 
                 # Download button
                 csv = df.to_csv(index=False)
