@@ -6,6 +6,9 @@
 streamlit_secrets.toml
 .streamlit/secrets.toml
 
+# Documentation files (not needed in production)
+DEPLOYMENT.md
+
 # Python cache
 __pycache__/
 *.pyc
