@@ -306,13 +306,14 @@ def fetch_events_list(person_id):
         
         if result.returncode == 0:
             # Parse the output to extract events
-            return parse_events_from_output(result.stdout)
+            events = parse_events_from_output(result.stdout)
+            return True, events
         else:
             st.error(f"Failed to fetch events: {result.stderr}")
-            return []
+            return False, []
     except Exception as e:
         st.error(f"Failed to fetch events: {str(e)}")
-        return []
+        return False, []
 
 def fetch_specific_event_data(person_id, timestamp):
     """Fetch data for a specific event timestamp"""
