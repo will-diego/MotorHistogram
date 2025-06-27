@@ -638,38 +638,20 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
-            # Pagination controls at the top
-            col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
+            # Modern section header
+            st.markdown("""
+            <div style="margin: 2rem 0 1rem 0;">
+                <h2 style="color: #1f2937; border-bottom: 3px solid #3b82f6; padding-bottom: 0.5rem; margin: 0;">
+                    📋 Select Event to Download
+                </h2>
+            </div>
+            """, unsafe_allow_html=True)
             
-            with col1:
-                if st.button("⏮️ First", disabled=(current_page == 0)):
-                    st.session_state.event_page = 0
-                    st.rerun()
-            
-            with col2:
-                if st.button("◀️ Previous", disabled=(current_page == 0)):
-                    st.session_state.event_page = max(0, current_page - 1)
-                    st.rerun()
-            
-            with col3:
-                st.markdown(f"**Page {current_page + 1} of {total_pages}** (Events {start_idx + 1}-{end_idx} of {total_events})")
-            
-            with col4:
-                if st.button("Next ▶️", disabled=(current_page >= total_pages - 1)):
-                    st.session_state.event_page = min(total_pages - 1, current_page + 1)
-                    st.rerun()
-            
-            with col5:
-                if st.button("Last ⏭️", disabled=(current_page >= total_pages - 1)):
-                    st.session_state.event_page = total_pages - 1
-                    st.rerun()
-            
-            # Create a DataFrame for the current page events
+            # Create an interactive table with selectable rows
             events_df = pd.DataFrame([
                 {
                     "Event #": event['number'],
                     "Date & Time (PT)": format_timestamp_readable(event['timestamp']),
-                    "Session ID": event['session_id'][:8] + "..." if len(event['session_id']) > 8 else event['session_id'],
                     "Properties": event['properties_count'],
                     "Full Session ID": event['session_id'],  # Hidden column for reference
                     "Original Timestamp": event['timestamp']  # Hidden column for reference
@@ -677,19 +659,10 @@ def main():
                 for event in current_events
             ])
             
-            # Modern section header
-            st.markdown("""
-            <div style="margin: 2rem 0 1rem 0;">
-                <h2 style="color: #1f2937; border-bottom: 3px solid #3b82f6; padding-bottom: 0.5rem; margin: 0;">
-                    📋 Available Events (Current Page)
-                </h2>
-            </div>
-            """, unsafe_allow_html=True)
+            # Create an interactive table with selectable rows
+            display_df = events_df[["Event #", "Date & Time (PT)", "Properties"]].copy()
             
-            # Display events in a clean, simplified table with better styling
-            display_df = events_df[["Event #", "Date & Time (PT)", "Properties"]]
-            
-            # Custom CSS for the dataframe
+            # Custom CSS for the data editor
             st.markdown("""
             <style>
             .stDataFrame {
@@ -700,125 +673,120 @@ def main():
             </style>
             """, unsafe_allow_html=True)
             
-            st.dataframe(display_df, use_container_width=True, height=min(350, len(current_events) * 35 + 100), hide_index=True)
+            # Use data_editor with row selection
+            edited_df = st.data_editor(
+                display_df,
+                use_container_width=True,
+                height=min(400, len(current_events) * 40 + 100),
+                hide_index=True,
+                column_config={
+                    "Event #": st.column_config.TextColumn("Event #", width="small"),
+                    "Date & Time (PT)": st.column_config.TextColumn("Date & Time (PT)", width="large"),
+                    "Properties": st.column_config.NumberColumn("Properties", width="small")
+                },
+                disabled=["Event #", "Date & Time (PT)", "Properties"],  # Make columns read-only
+                key=f"event_table_page_{current_page}"
+            )
             
-            # Modern section divider
-            st.markdown("""
-            <div style="margin: 2rem 0 1rem 0;">
-                <h2 style="color: #1f2937; border-bottom: 3px solid #10b981; padding-bottom: 0.5rem; margin: 0;">
-                    🎯 Select Event to Download
-                </h2>
-            </div>
-            """, unsafe_allow_html=True)
+            # Action buttons section
+            st.markdown("---")
             
-            # Enhanced dropdown with current page events only
-            event_options = [f"Event {event['number']}: {format_timestamp_readable(event['timestamp'])}" for event in current_events]
+            col1, col2, col3 = st.columns([1, 1, 1])
             
-            # Create a nice container for the dropdown
-            with st.container():
-                if event_options:
-                    selected_option = st.selectbox(
-                        "Choose an event from current page:",
-                        options=event_options,
-                        index=0,
-                        help="Select the motor data event you want to analyze",
-                        key=f"event_selector_page_{current_page}"
-                    )
-                    
-                    # Get the selected event index (relative to current page)
-                    selected_idx = event_options.index(selected_option)
-                    selected_event = current_events[selected_idx]
-                    selected_timestamp = selected_event['timestamp']
-                    
-                    # Modern selected event card with gradient background
-                    st.markdown(f"""
-                    <div style="
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        border-radius: 1rem;
-                        padding: 1.5rem;
-                        margin: 1.5rem 0;
-                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-                    ">
-                        <h3 style="color: white; margin: 0 0 0.5rem 0; font-size: 1.25rem;">
-                            📋 Selected Event
-                        </h3>
-                        <div style="
-                            background: rgba(255, 255, 255, 0.2);
-                            border-radius: 0.5rem;
-                            padding: 1rem;
-                            backdrop-filter: blur(10px);
-                        ">
-                            <p style="color: white; margin: 0; font-size: 1.1rem; font-weight: 500;">
-                                <span style="background: rgba(255, 255, 255, 0.3); padding: 0.25rem 0.5rem; border-radius: 0.25rem; margin-right: 0.5rem;">
-                                    Event {selected_event['number']}
-                                </span>
-                                {format_timestamp_readable(selected_timestamp)}
-                            </p>
-                            <p style="color: #e5e7eb; margin: 0.5rem 0 0 0; font-size: 0.95rem;">
-                                📊 Contains {selected_event['properties_count']} motor data properties
-                            </p>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Modern action buttons with spacing
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    
-                    col1, col2, col3 = st.columns([1, 2, 1])
-                    
-                    with col1:
-                        if st.button("🔙 Back to Dashboard", use_container_width=True, help="Return to main dashboard"):
+            with col1:
+                if st.button("🔙 Back to Dashboard", use_container_width=True, help="Return to main dashboard"):
+                    st.session_state.show_event_browser = False
+                    if 'event_page' in st.session_state:
+                        del st.session_state.event_page  # Reset pagination
+                    st.rerun()
+            
+            with col2:
+                # Download button for the first event by default, or user can click on rows to select
+                if st.button("📥 Download Most Recent Event", use_container_width=True, type="primary", 
+                           help="Download the most recent event (Event 1) and return to dashboard"):
+                    if current_events:
+                        selected_event = current_events[0]  # Most recent event
+                        selected_timestamp = selected_event['timestamp']
+                        
+                        with st.spinner("📥 Downloading motor data..."):
+                            success, output = fetch_specific_event_data(person_id, selected_timestamp)
+                        
+                        if success:
                             st.session_state.show_event_browser = False
                             if 'event_page' in st.session_state:
                                 del st.session_state.event_page  # Reset pagination
                             st.rerun()
-                    
-                    with col2:
-                        if st.button("📥 Download & Analyze Event", use_container_width=True, type="primary", help="Download this event data and return to dashboard"):
-                            with st.spinner("📥 Downloading motor data..."):
-                                success, output = fetch_specific_event_data(person_id, selected_timestamp)
-                            
-                            if success:
-                                st.session_state.show_event_browser = False
-                                if 'event_page' in st.session_state:
-                                    del st.session_state.event_page  # Reset pagination
-                                st.rerun()
-                            else:
-                                st.error(f"❌ Download failed: {output}")
-                                st.info("💡 Try selecting a different event or refresh the list.")
-                    
-                    with col3:
-                        if st.button("🔄 Refresh", use_container_width=True, help="Refresh the event list"):
+                        else:
+                            st.error(f"❌ Download failed: {output}")
+                            st.info("💡 Try refreshing the list or check your connection.")
+            
+            with col3:
+                if st.button("🔄 Refresh", use_container_width=True, help="Refresh the event list"):
+                    if 'event_page' in st.session_state:
+                        del st.session_state.event_page  # Reset pagination
+                    st.rerun()
+            
+            # Additional download options for specific events
+            st.markdown("### 🎯 Download Specific Event")
+            
+            # Simple selectbox for choosing specific events if needed
+            event_options = [f"Event {event['number']}: {format_timestamp_readable(event['timestamp'])}" for event in current_events]
+            
+            if event_options:
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    selected_option = st.selectbox(
+                        "Or choose a specific event:",
+                        options=event_options,
+                        help="Select any event from the current page to download",
+                        key=f"specific_event_selector_page_{current_page}"
+                    )
+                
+                with col2:
+                    if st.button("📥 Download Selected", help="Download the specifically selected event"):
+                        selected_idx = event_options.index(selected_option)
+                        selected_event = current_events[selected_idx]
+                        selected_timestamp = selected_event['timestamp']
+                        
+                        with st.spinner("📥 Downloading motor data..."):
+                            success, output = fetch_specific_event_data(person_id, selected_timestamp)
+                        
+                        if success:
+                            st.session_state.show_event_browser = False
                             if 'event_page' in st.session_state:
                                 del st.session_state.event_page  # Reset pagination
                             st.rerun()
-                else:
-                    st.warning("No events available on this page.")
+                        else:
+                            st.error(f"❌ Download failed: {output}")
+                            st.info("💡 Try selecting a different event or refresh the list.")
             
-            # Pagination controls at the bottom (same as top)
+            # Pagination controls
             st.markdown("---")
+            st.markdown("### 📄 Page Navigation")
+            
             col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
             
             with col1:
-                if st.button("⏮️ First ", disabled=(current_page == 0), key="first_bottom"):
+                if st.button("⏮️ First", disabled=(current_page == 0), key="first_page"):
                     st.session_state.event_page = 0
                     st.rerun()
             
             with col2:
-                if st.button("◀️ Previous ", disabled=(current_page == 0), key="prev_bottom"):
+                if st.button("◀️ Previous", disabled=(current_page == 0), key="prev_page"):
                     st.session_state.event_page = max(0, current_page - 1)
                     st.rerun()
             
             with col3:
-                st.markdown(f"**Page {current_page + 1} of {total_pages}**")
+                st.markdown(f"**Page {current_page + 1} of {total_pages}** (Events {start_idx + 1}-{end_idx} of {total_events})")
             
             with col4:
-                if st.button("Next ▶️ ", disabled=(current_page >= total_pages - 1), key="next_bottom"):
+                if st.button("Next ▶️", disabled=(current_page >= total_pages - 1), key="next_page"):
                     st.session_state.event_page = min(total_pages - 1, current_page + 1)
                     st.rerun()
             
             with col5:
-                if st.button("Last ⏭️ ", disabled=(current_page >= total_pages - 1), key="last_bottom"):
+                if st.button("Last ⏭️", disabled=(current_page >= total_pages - 1), key="last_page"):
                     st.session_state.event_page = total_pages - 1
                     st.rerun()
         else:
