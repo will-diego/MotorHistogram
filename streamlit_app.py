@@ -691,7 +691,8 @@ def main():
             # Action buttons section
             st.markdown("---")
             
-            col1, col2, col3 = st.columns([1, 1, 1])
+            # Main action buttons with event selection
+            col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
             
             with col1:
                 if st.button("🔙 Back to Dashboard", use_container_width=True, help="Return to main dashboard"):
@@ -701,14 +702,14 @@ def main():
                     st.rerun()
             
             with col2:
-                # Download button for the first event by default, or user can click on rows to select
-                if st.button("📥 Download Most Recent Event", use_container_width=True, type="primary", 
-                           help="Download the most recent event (Event 1) and return to dashboard"):
+                # Download most recent event (Event 1)
+                if st.button("📥 Event 1 (Most Recent)", use_container_width=True, type="primary", 
+                           help="Download Event 1 - the most recent motor data"):
                     if current_events:
                         selected_event = current_events[0]  # Most recent event
                         selected_timestamp = selected_event['timestamp']
                         
-                        with st.spinner("📥 Downloading motor data..."):
+                        with st.spinner(f"📥 Downloading Event {selected_event['number']}..."):
                             success, output = fetch_specific_event_data(person_id, selected_timestamp)
                         
                         if success:
@@ -721,35 +722,14 @@ def main():
                             st.info("💡 Try refreshing the list or check your connection.")
             
             with col3:
-                if st.button("🔄 Refresh", use_container_width=True, help="Refresh the event list"):
-                    if 'event_page' in st.session_state:
-                        del st.session_state.event_page  # Reset pagination
-                    st.rerun()
-            
-            # Additional download options for specific events
-            st.markdown("### 🎯 Download Specific Event")
-            
-            # Simple selectbox for choosing specific events if needed
-            event_options = [f"Event {event['number']}: {format_timestamp_readable(event['timestamp'])}" for event in current_events]
-            
-            if event_options:
-                col1, col2 = st.columns([2, 1])
-                
-                with col1:
-                    selected_option = st.selectbox(
-                        "Or choose a specific event:",
-                        options=event_options,
-                        help="Select any event from the current page to download",
-                        key=f"specific_event_selector_page_{current_page}"
-                    )
-                
-                with col2:
-                    if st.button("📥 Download Selected", help="Download the specifically selected event"):
-                        selected_idx = event_options.index(selected_option)
-                        selected_event = current_events[selected_idx]
+                # Download second most recent event (Event 2) if available
+                if len(current_events) >= 2:
+                    if st.button("📥 Event 2", use_container_width=True, 
+                               help="Download Event 2 - second most recent"):
+                        selected_event = current_events[1]  # Second event
                         selected_timestamp = selected_event['timestamp']
                         
-                        with st.spinner("📥 Downloading motor data..."):
+                        with st.spinner(f"📥 Downloading Event {selected_event['number']}..."):
                             success, output = fetch_specific_event_data(person_id, selected_timestamp)
                         
                         if success:
@@ -759,7 +739,46 @@ def main():
                             st.rerun()
                         else:
                             st.error(f"❌ Download failed: {output}")
-                            st.info("💡 Try selecting a different event or refresh the list.")
+                            st.info("💡 Try refreshing the list or check your connection.")
+                else:
+                    st.button("📥 Event 2", disabled=True, use_container_width=True, help="Event 2 not available")
+            
+            with col4:
+                if st.button("🔄 Refresh", use_container_width=True, help="Refresh the event list"):
+                    if 'event_page' in st.session_state:
+                        del st.session_state.event_page  # Reset pagination
+                    st.rerun()
+            
+            # Second row of action buttons for more events
+            if len(current_events) >= 3:
+                st.markdown("### 📥 More Events on This Page")
+                
+                # Calculate how many buttons we can show (max 5 more events)
+                remaining_events = current_events[2:]  # Skip first 2 already shown
+                max_buttons = min(5, len(remaining_events))
+                
+                if max_buttons > 0:
+                    cols = st.columns(max_buttons)
+                    
+                    for i, event in enumerate(remaining_events[:max_buttons]):
+                        with cols[i]:
+                            event_num = event['number']
+                            if st.button(f"📥 Event {event_num}", 
+                                       use_container_width=True,
+                                       help=f"Download Event {event_num}: {format_timestamp_readable(event['timestamp'])}"):
+                                selected_timestamp = event['timestamp']
+                                
+                                with st.spinner(f"📥 Downloading Event {event_num}..."):
+                                    success, output = fetch_specific_event_data(person_id, selected_timestamp)
+                                
+                                if success:
+                                    st.session_state.show_event_browser = False
+                                    if 'event_page' in st.session_state:
+                                        del st.session_state.event_page  # Reset pagination
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ Download failed: {output}")
+                                    st.info("💡 Try refreshing the list or check your connection.")
             
             # Pagination controls
             st.markdown("---")
