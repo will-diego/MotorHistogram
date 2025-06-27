@@ -447,7 +447,7 @@ def run_histogram_generation():
             return False, e.stderr
 
 def fetch_bulk_events(person_id, event_count=None):
-    """Fetch multiple events and combine them into a single dataset"""
+    """Fetch multiple events and combine them into a single dataset (only events with 160+ properties)"""
     try:
         # Ensure output directories exist
         os.makedirs("csv_outputs", exist_ok=True)
@@ -465,14 +465,24 @@ def fetch_bulk_events(person_id, event_count=None):
         if not events:
             return False, "No events found"
         
+        # Filter events to only include those with 160+ properties (quality control)
+        quality_events = [event for event in events if event['properties_count'] >= 160]
+        
+        if not quality_events:
+            return False, f"No high-quality events found (need 160+ properties). Found {len(events)} events but all had fewer than 160 properties."
+        
+        # Show filtering info
+        if len(quality_events) < len(events):
+            st.info(f"🔍 Quality filter: Using {len(quality_events)} events with 160+ properties (filtered out {len(events) - len(quality_events)} low-quality events)")
+        
         if event_count:
-            # Take only the requested number of recent events
-            selected_events = events[:event_count]
-            action_text = f"last {event_count}"
+            # Take only the requested number of recent quality events
+            selected_events = quality_events[:event_count]
+            action_text = f"last {event_count} quality"
         else:
-            # Take all events
-            selected_events = events
-            action_text = f"all {len(events)}"
+            # Take all quality events
+            selected_events = quality_events
+            action_text = f"all {len(quality_events)} quality"
         
         # Download each event
         success_count = 0
@@ -482,7 +492,7 @@ def fetch_bulk_events(person_id, event_count=None):
         for i, event in enumerate(selected_events):
             progress = (i + 1) / len(selected_events)
             progress_bar.progress(progress)
-            status_text.text(f"Downloading event {i+1}/{len(selected_events)}: {event['timestamp'][:16]}...")
+            status_text.text(f"Downloading event {i+1}/{len(selected_events)}: {event['timestamp'][:16]} ({event['properties_count']} properties)...")
             
             # Download individual event
             event_cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", event['timestamp'], "-s", ""]
@@ -496,7 +506,7 @@ def fetch_bulk_events(person_id, event_count=None):
         status_text.empty()
         
         if success_count > 0:
-            st.success(f"✅ Successfully downloaded {success_count}/{len(selected_events)} events! Data has been combined in CSV files.")
+            st.success(f"✅ Successfully downloaded {success_count}/{len(selected_events)} quality events! Data has been combined in CSV files.")
             return True, f"Downloaded {action_text} events successfully ({success_count}/{len(selected_events)} succeeded)"
         else:
             return False, "Failed to download any events"
@@ -786,14 +796,14 @@ def main():
             # Bulk download section
             st.markdown("---")
             st.markdown("### 📦 Bulk Downloads")
-            st.markdown("*Download multiple events at once for comprehensive analysis*")
+            st.markdown("*Download multiple events at once for comprehensive analysis (160+ properties only)*")
             
             col1, col2, col3 = st.columns([1, 1, 1])
             
             with col1:
-                if st.button("📥 Get Last 5 Events", use_container_width=True, type="secondary", 
-                           help="Download and combine the 5 most recent events into datasets"):
-                    with st.spinner("📥 Downloading last 5 events..."):
+                if st.button("📥 Get Last 5 Quality Events", use_container_width=True, type="secondary", 
+                           help="Download and combine the 5 most recent events with 160+ properties"):
+                    with st.spinner("📥 Downloading last 5 quality events..."):
                         success, output = fetch_bulk_events(person_id, event_count=5)
                     
                     if success:
@@ -806,15 +816,15 @@ def main():
                         st.info("💡 Try refreshing the list or downloading individual events.")
             
             with col2:
-                if st.button("📥 Get All Events", use_container_width=True, type="secondary",
-                           help="Download all available events (may take several minutes)"):
+                if st.button("📥 Get All Quality Events", use_container_width=True, type="secondary",
+                           help="Download all available quality events with 160+ properties (may take several minutes)"):
                     # Show confirmation dialog
                     if 'confirm_all_events' not in st.session_state:
                         st.session_state.confirm_all_events = True
-                        st.warning("⚠️ This will download ALL available events and may take several minutes. Click again to confirm.")
+                        st.warning("⚠️ This will download ALL quality events (160+ properties) and may take several minutes. Click again to confirm.")
                     else:
                         del st.session_state.confirm_all_events
-                        with st.spinner("📥 Downloading all events... This may take several minutes..."):
+                        with st.spinner("📥 Downloading all quality events... This may take several minutes..."):
                             success, output = fetch_bulk_events(person_id, event_count=None)
                         
                         if success:
