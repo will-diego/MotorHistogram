@@ -46,31 +46,39 @@ def main():
     timestamp = latest_row.get('timestamp', 'Unknown')
     print(f"📅 Using data from: {timestamp}")
     
-    # Define motor data categories with their column patterns
+    # Define motor data categories with their column patterns and expected ranges
     categories = {
         'power': {
             'patterns': [r'power\d+', r'powerHigh', r'powerLow'],
             'title': 'Motor Power',
             'xlabel': 'Power Index',
-            'ylabel': 'Power Values'
+            'ylabel': 'Power Values',
+            'range': (25, 800),  # Expected range: 25-800
+            'filter_zeros': True
         },
         'torque': {
             'patterns': [r'torque\d+', r'torqueHigh', r'torqueLow'], 
             'title': 'Motor Torque',
             'xlabel': 'Torque Index', 
-            'ylabel': 'Torque Values'
+            'ylabel': 'Torque Values',
+            'range': (2, 90),  # Expected range: 2-90
+            'filter_zeros': True
         },
         'motor_temp': {
             'patterns': [r'motor.*temp', r'Motor\.Temperature', r'motortemperature'],
             'title': 'Motor Temperature',
             'xlabel': 'Temperature Index',
-            'ylabel': 'Temperature (°C)'
+            'ylabel': 'Temperature (°C)',
+            'range': (10, 200),  # Expected range: 10-200°C
+            'filter_zeros': False
         },
         'mosfet_temp': {
             'patterns': [r'mosfet.*temp', r'MOSFET\.Temperature', r'mosfettemperature'],
             'title': 'MOSFET Temperature', 
             'xlabel': 'Temperature Index',
-            'ylabel': 'Temperature (°C)'
+            'ylabel': 'Temperature (°C)',
+            'range': (10, 200),  # Expected range: 10-200°C
+            'filter_zeros': False
         }
     }
     
@@ -113,8 +121,14 @@ def main():
                 if np.isnan(numeric_value):
                     continue
                 
-                # Skip zero values for torque and power (they clutter the charts)
-                if ('torque' in category_name or 'power' in category_name) and numeric_value == 0:
+                # Skip zero values for categories that have filter_zeros enabled
+                if category_info.get('filter_zeros', False) and numeric_value == 0:
+                    continue
+                
+                # Validate value is within expected range
+                min_val, max_val = category_info.get('range', (0, float('inf')))
+                if numeric_value < min_val or numeric_value > max_val:
+                    print(f"   ⚠️ Value {numeric_value} for {col} outside expected range {min_val}-{max_val}, skipping")
                     continue
                 
                 # Extract numeric index from column name
@@ -132,18 +146,31 @@ def main():
         
         if not chart_data:
             print(f"   ❌ No valid numeric data found for {category_name}")
+            min_val, max_val = category_info.get('range', (0, float('inf')))
+            print(f"   💡 Expected range: {min_val}-{max_val}, Zero filtering: {category_info.get('filter_zeros', False)}")
             continue
         
         # Sort by index
         chart_data.sort(key=lambda x: x['index'])
         
-        # Remove outliers for cleaner charts (optional)
+        # Remove statistical outliers for cleaner charts
         if len(chart_data) > 5:
-            # Remove first element if it's much larger than others (common issue)
             values = [item['value'] for item in chart_data]
-            if values[0] > np.mean(values[1:]) * 3:
-                chart_data = chart_data[1:]
-                print(f"   🧹 Removed outlier: {values[0]}")
+            mean_val = np.mean(values)
+            std_val = np.std(values)
+            
+            # Remove values that are more than 3 standard deviations from mean
+            filtered_data = []
+            outliers_removed = 0
+            for item in chart_data:
+                if abs(item['value'] - mean_val) <= 3 * std_val:
+                    filtered_data.append(item)
+                else:
+                    outliers_removed += 1
+            
+            if outliers_removed > 0:
+                chart_data = filtered_data
+                print(f"   🧹 Removed {outliers_removed} statistical outliers")
         
         if not chart_data:
             print(f"   ❌ No data remaining after cleaning for {category_name}")
