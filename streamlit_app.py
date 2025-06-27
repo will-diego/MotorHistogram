@@ -449,6 +449,8 @@ def run_histogram_generation():
 def fetch_bulk_events(person_id, event_count=None):
     """Fetch multiple events and combine them into a single dataset (only events with 160+ properties)"""
     try:
+        import pandas as pd
+        
         # Ensure output directories exist
         os.makedirs("csv_outputs", exist_ok=True)
         os.makedirs("histogram_outputs", exist_ok=True)
@@ -484,7 +486,17 @@ def fetch_bulk_events(person_id, event_count=None):
             selected_events = quality_events
             action_text = f"all {len(quality_events)} quality"
         
-        # Download each event
+        # Initialize combined data structures
+        combined_data = {
+            'power': [],
+            'torque': [],
+            'motor_temp': [],
+            'mosfet_temp': [],
+            'mosfet_cooldown': [],
+            'motor_cooldown': []
+        }
+        
+        # Download and combine each event
         success_count = 0
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -494,20 +506,46 @@ def fetch_bulk_events(person_id, event_count=None):
             progress_bar.progress(progress)
             status_text.text(f"Downloading event {i+1}/{len(selected_events)}: {event['timestamp'][:16]} ({event['properties_count']} properties)...")
             
-            # Download individual event
+            # Download individual event to temporary files
             event_cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", event['timestamp'], "-s", ""]
             event_result = subprocess.run(event_cmd, capture_output=True, text=True, cwd=".", timeout=60)
             
             if event_result.returncode == 0:
                 success_count += 1
+                
+                # Read the generated CSV files and combine the data
+                for category in combined_data.keys():
+                    csv_file = f"csv_outputs/posthog_event_{category}.csv"
+                    if os.path.exists(csv_file):
+                        try:
+                            df = pd.read_csv(csv_file)
+                            if not df.empty:
+                                combined_data[category].append(df)
+                        except Exception as e:
+                            st.warning(f"Warning: Could not read {csv_file}: {str(e)}")
         
         # Clear progress indicators
         progress_bar.empty()
         status_text.empty()
         
         if success_count > 0:
-            st.success(f"✅ Successfully downloaded {success_count}/{len(selected_events)} quality events! Data has been combined in CSV files.")
-            return True, f"Downloaded {action_text} events successfully ({success_count}/{len(selected_events)} succeeded)"
+            # Combine all dataframes for each category and save
+            status_text.text("Combining data from all events...")
+            
+            for category, dataframes in combined_data.items():
+                if dataframes:
+                    # Combine all dataframes for this category
+                    combined_df = pd.concat(dataframes, ignore_index=True)
+                    
+                    # Save the combined data
+                    csv_file = f"csv_outputs/posthog_event_{category}.csv"
+                    combined_df.to_csv(csv_file, index=False)
+                    
+                    st.info(f"📊 Combined {category}: {len(combined_df)} total rows from {len(dataframes)} events")
+            
+            status_text.empty()
+            st.success(f"✅ Successfully combined {success_count}/{len(selected_events)} quality events! Combined data saved to CSV files.")
+            return True, f"Downloaded and combined {action_text} events successfully ({success_count}/{len(selected_events)} succeeded)"
         else:
             return False, "Failed to download any events"
     
