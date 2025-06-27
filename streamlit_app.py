@@ -450,6 +450,8 @@ def fetch_bulk_events(person_id, event_count=None):
     """Fetch multiple events and combine them into a single dataset (only events with 160+ properties)"""
     try:
         import pandas as pd
+        import requests
+        import os
         
         # Ensure output directories exist
         os.makedirs("csv_outputs", exist_ok=True)
@@ -473,75 +475,138 @@ def fetch_bulk_events(person_id, event_count=None):
         if not quality_events:
             return False, f"No high-quality events found (need 160+ properties). Found {len(events)} events but all had fewer than 160 properties."
         
-        # Show filtering info
-        if len(quality_events) < len(events):
-            st.info(f"🔍 Quality filter: Using {len(quality_events)} events with 160+ properties (filtered out {len(events) - len(quality_events)} low-quality events)")
-        
         if event_count:
             # Take only the requested number of recent quality events
             selected_events = quality_events[:event_count]
             action_text = f"last {event_count} quality"
+            # Show filtering info specific to the requested count
+            st.info(f"🔍 Quality filter: Selected {len(selected_events)} quality events from {len(quality_events)} available events with 160+ properties")
         else:
             # Take all quality events
             selected_events = quality_events
             action_text = f"all {len(quality_events)} quality"
+            # Show filtering info for all events
+            if len(quality_events) < len(events):
+                st.info(f"🔍 Quality filter: Using {len(quality_events)} events with 160+ properties (filtered out {len(events) - len(quality_events)} low-quality events)")
         
-        # Initialize combined data structures
-        combined_data = {
-            'power': [],
-            'torque': [],
-            'motor_temp': [],
-            'mosfet_temp': [],
-            'mosfet_cooldown': [],
-            'motor_cooldown': []
-        }
+        # Initialize combined data structures with timestamps
+        all_events_data = []
         
-        # Download and combine each event
+        # Download each event and collect raw data
         success_count = 0
         progress_bar = st.progress(0)
         status_text = st.empty()
         
+        # Use PostHog API directly to get raw event data
+        POSTHOG_API_KEY = os.getenv("POSTHOG_API_KEY")
+        PROJECT_ID = os.getenv("POSTHOG_PROJECT_ID", "113002")
+        headers = {"Authorization": f"Bearer {POSTHOG_API_KEY}", "Content-Type": "application/json"}
+        
         for i, event in enumerate(selected_events):
             progress = (i + 1) / len(selected_events)
             progress_bar.progress(progress)
-            status_text.text(f"Downloading event {i+1}/{len(selected_events)}: {event['timestamp'][:16]} ({event['properties_count']} properties)...")
+            status_text.text(f"Fetching event {i+1}/{len(selected_events)}: {event['timestamp'][:16]} ({event['properties_count']} properties)...")
             
-            # Download individual event to temporary files
-            event_cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", event['timestamp'], "-s", ""]
-            event_result = subprocess.run(event_cmd, capture_output=True, text=True, cwd=".", timeout=60)
-            
-            if event_result.returncode == 0:
-                success_count += 1
+            try:
+                # Make direct API call to get this specific event
+                url = f"https://us.posthog.com/api/projects/{PROJECT_ID}/events/?event=Motor Data&person_id={person_id}&after={event['timestamp']}&before={event['timestamp']}&limit=1"
+                response = requests.get(url, headers=headers, timeout=30)
                 
-                # Read the generated CSV files and combine the data
-                for category in combined_data.keys():
-                    csv_file = f"csv_outputs/posthog_event_{category}.csv"
-                    if os.path.exists(csv_file):
-                        try:
-                            df = pd.read_csv(csv_file)
-                            if not df.empty:
-                                combined_data[category].append(df)
-                        except Exception as e:
-                            st.warning(f"Warning: Could not read {csv_file}: {str(e)}")
+                if response.status_code == 200:
+                    data = response.json()
+                    if 'results' in data and data['results']:
+                        event_data = data['results'][0]
+                        all_events_data.append({
+                            'timestamp': event['timestamp'],
+                            'properties': event_data.get('properties', {}),
+                            'event_id': event_data.get('id', f'event_{i+1}')
+                        })
+                        success_count += 1
+                    else:
+                        st.warning(f"No data found for event {i+1}")
+                else:
+                    st.warning(f"API error for event {i+1}: {response.status_code}")
+                    
+            except Exception as e:
+                st.warning(f"Error fetching event {i+1}: {str(e)}")
+                continue
         
         # Clear progress indicators
         progress_bar.empty()
         status_text.empty()
         
         if success_count > 0:
-            # Combine all dataframes for each category and save
-            status_text.text("Combining data from all events...")
+            # Process and combine all event data
+            status_text.text("Processing and combining data from all events...")
             
-            for category, dataframes in combined_data.items():
-                if dataframes:
-                    # Combine all dataframes for this category
-                    combined_df = pd.concat(dataframes, ignore_index=True)
+            # Initialize combined data structures
+            combined_data = {
+                'power': [],
+                'torque': [],
+                'motor_temp': [],
+                'mosfet_temp': [],
+                'mosfet_cooldown': [],
+                'motor_cooldown': []
+            }
+            
+            # Process each event's properties
+            for event_info in all_events_data:
+                timestamp = event_info['timestamp']
+                properties = event_info['properties']
+                
+                # Create data rows for this event
+                power_row = {"timestamp": timestamp}
+                torque_row = {"timestamp": timestamp}
+                motor_temp_row = {"timestamp": timestamp}
+                mosfet_temp_row = {"timestamp": timestamp}
+                mosfet_cooldown_row = {"timestamp": timestamp}
+                motor_cooldown_row = {"timestamp": timestamp}
+                
+                # Categorize properties
+                for key, value in properties.items():
+                    key_lower = key.lower()
                     
-                    # Save the combined data
+                    if key_lower.startswith('power'):
+                        power_row[key] = value
+                    elif key_lower.startswith('torque'):
+                        torque_row[key] = value
+                    elif 'motortemp' in key_lower:
+                        motor_temp_row[key] = value
+                    elif 'mosfettemp' in key_lower and 'cooldown' not in key_lower:
+                        mosfet_temp_row[key] = value
+                    elif 'mosfet' in key_lower and 'cooldown' in key_lower:
+                        mosfet_cooldown_row[key] = value
+                    elif 'cooldownmosfet' in key_lower:
+                        mosfet_cooldown_row[key] = value
+                    elif 'motor' in key_lower and 'cooldown' in key_lower:
+                        motor_cooldown_row[key] = value
+                    elif 'cooldownmotor' in key_lower:
+                        motor_cooldown_row[key] = value
+                
+                # Add rows to combined data if they have properties
+                if len(power_row) > 1:
+                    combined_data['power'].append(power_row)
+                if len(torque_row) > 1:
+                    combined_data['torque'].append(torque_row)
+                if len(motor_temp_row) > 1:
+                    combined_data['motor_temp'].append(motor_temp_row)
+                if len(mosfet_temp_row) > 1:
+                    combined_data['mosfet_temp'].append(mosfet_temp_row)
+                if len(mosfet_cooldown_row) > 1:
+                    combined_data['mosfet_cooldown'].append(mosfet_cooldown_row)
+                if len(motor_cooldown_row) > 1:
+                    combined_data['motor_cooldown'].append(motor_cooldown_row)
+            
+            # Save combined data to CSV files
+            for category, rows in combined_data.items():
+                if rows:
+                    df = pd.DataFrame(rows)
                     csv_file = f"csv_outputs/posthog_event_{category}.csv"
-                    combined_df.to_csv(csv_file, index=False)
+                    df.to_csv(csv_file, index=False)
                     
-                    st.info(f"📊 Combined {category}: {len(combined_df)} total rows from {len(dataframes)} events")
+                    # Calculate total properties for this category
+                    total_properties = sum(len(row) - 1 for row in rows)  # -1 for timestamp
+                    st.info(f"📊 Combined {category}: {len(rows)} rows, {total_properties} total properties from {success_count} events")
             
             status_text.empty()
             st.success(f"✅ Successfully combined {success_count}/{len(selected_events)} quality events! Combined data saved to CSV files.")
