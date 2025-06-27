@@ -247,6 +247,36 @@ def create_interactive_histogram(df, category):
     
     return fig
 
+def parse_events_from_output(output):
+    """Parse events from GetPostHog.py output"""
+    events = []
+    lines = output.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        # Look for lines that contain timestamp patterns (ISO format)
+        if 'T' in line and 'Z' in line and ('Motor Data' in line or 'Event' in line):
+            # Extract timestamp from the line
+            import re
+            timestamp_match = re.search(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z', line)
+            if timestamp_match:
+                timestamp = timestamp_match.group()
+                events.append({
+                    'timestamp': timestamp,
+                    'line': line
+                })
+        elif line.startswith('-') and ('T' in line and 'Z' in line):
+            # Alternative format: lines starting with dash
+            timestamp_match = re.search(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z', line)
+            if timestamp_match:
+                timestamp = timestamp_match.group()
+                events.append({
+                    'timestamp': timestamp,
+                    'line': line
+                })
+    
+    return events
+
 def fetch_motor_data(person_id, session_id=None):
     """Fetch motor data from PostHog for the given person ID"""
     try:
