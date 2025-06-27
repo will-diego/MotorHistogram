@@ -1,5 +1,5 @@
 # Sensitive configuration files
-config.py
+# config.py - Now safe for deployment (uses Streamlit secrets)
 .env
 .env.local
 .env.production
