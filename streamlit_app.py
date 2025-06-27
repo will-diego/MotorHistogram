@@ -638,6 +638,10 @@ def main():
             success, events = fetch_events_list(person_id)
         
         if success and events:
+            # Initialize pagination state
+            if 'event_page' not in st.session_state:
+                st.session_state.event_page = 0
+            
             # Convert the parsed events to a more structured format
             formatted_events = []
             for i, event in enumerate(events, 1):
@@ -649,16 +653,58 @@ def main():
                     'details': event.get('line', '')
                 })
             
-            # Modern success card
+            # Pagination settings
+            events_per_page = 10
+            total_events = len(formatted_events)
+            total_pages = (total_events + events_per_page - 1) // events_per_page  # Ceiling division
+            current_page = st.session_state.event_page
+            
+            # Ensure current page is within bounds
+            if current_page >= total_pages:
+                st.session_state.event_page = 0
+                current_page = 0
+            
+            # Calculate start and end indices for current page
+            start_idx = current_page * events_per_page
+            end_idx = min(start_idx + events_per_page, total_events)
+            current_events = formatted_events[start_idx:end_idx]
+            
+            # Modern success card with pagination info
             st.markdown(f"""
             <div style="background: #dcfce7; border: 1px solid #16a34a; border-radius: 0.75rem; padding: 1rem; margin: 1rem 0;">
                 <p style="color: #15803d; margin: 0; font-weight: 600;">
-                    ✅ Found {len(formatted_events)} recent motor data events
+                    ✅ Found {total_events} recent motor data events (Page {current_page + 1} of {total_pages})
                 </p>
             </div>
             """, unsafe_allow_html=True)
             
-            # Create a DataFrame for better display with formatted timestamps
+            # Pagination controls at the top
+            col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
+            
+            with col1:
+                if st.button("⏮️ First", disabled=(current_page == 0)):
+                    st.session_state.event_page = 0
+                    st.rerun()
+            
+            with col2:
+                if st.button("◀️ Previous", disabled=(current_page == 0)):
+                    st.session_state.event_page = max(0, current_page - 1)
+                    st.rerun()
+            
+            with col3:
+                st.markdown(f"**Page {current_page + 1} of {total_pages}** (Events {start_idx + 1}-{end_idx} of {total_events})")
+            
+            with col4:
+                if st.button("Next ▶️", disabled=(current_page >= total_pages - 1)):
+                    st.session_state.event_page = min(total_pages - 1, current_page + 1)
+                    st.rerun()
+            
+            with col5:
+                if st.button("Last ⏭️", disabled=(current_page >= total_pages - 1)):
+                    st.session_state.event_page = total_pages - 1
+                    st.rerun()
+            
+            # Create a DataFrame for the current page events
             events_df = pd.DataFrame([
                 {
                     "Event #": event['number'],
@@ -668,14 +714,14 @@ def main():
                     "Full Session ID": event['session_id'],  # Hidden column for reference
                     "Original Timestamp": event['timestamp']  # Hidden column for reference
                 }
-                for event in formatted_events[:25]  # Show max 25 events
+                for event in current_events
             ])
             
             # Modern section header
             st.markdown("""
             <div style="margin: 2rem 0 1rem 0;">
                 <h2 style="color: #1f2937; border-bottom: 3px solid #3b82f6; padding-bottom: 0.5rem; margin: 0;">
-                    📋 Available Events
+                    📋 Available Events (Current Page)
                 </h2>
             </div>
             """, unsafe_allow_html=True)
@@ -694,7 +740,7 @@ def main():
             </style>
             """, unsafe_allow_html=True)
             
-            st.dataframe(display_df, use_container_width=True, height=350)
+            st.dataframe(display_df, use_container_width=True, height=min(350, len(current_events) * 35 + 100))
             
             # Modern section divider
             st.markdown("""
@@ -705,79 +751,115 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
-            # Enhanced dropdown with better styling
-            event_options = [f"Event {event['number']}: {format_timestamp_readable(event['timestamp'])}" for event in formatted_events[:25]]
+            # Enhanced dropdown with current page events only
+            event_options = [f"Event {event['number']}: {format_timestamp_readable(event['timestamp'])}" for event in current_events]
             
             # Create a nice container for the dropdown
             with st.container():
-                selected_option = st.selectbox(
-                    "Choose an event:",
-                    options=event_options,
-                    index=0,
-                    help="Select the motor data event you want to analyze",
-                    key="event_selector"
-                )
+                if event_options:
+                    selected_option = st.selectbox(
+                        "Choose an event from current page:",
+                        options=event_options,
+                        index=0,
+                        help="Select the motor data event you want to analyze",
+                        key=f"event_selector_page_{current_page}"
+                    )
+                    
+                    # Get the selected event index (relative to current page)
+                    selected_idx = event_options.index(selected_option)
+                    selected_event = current_events[selected_idx]
+                    selected_timestamp = selected_event['timestamp']
+                    
+                    # Modern selected event card with gradient background
+                    st.markdown(f"""
+                    <div style="
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        border-radius: 1rem;
+                        padding: 1.5rem;
+                        margin: 1.5rem 0;
+                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                    ">
+                        <h3 style="color: white; margin: 0 0 0.5rem 0; font-size: 1.25rem;">
+                            📋 Selected Event
+                        </h3>
+                        <div style="
+                            background: rgba(255, 255, 255, 0.2);
+                            border-radius: 0.5rem;
+                            padding: 1rem;
+                            backdrop-filter: blur(10px);
+                        ">
+                            <p style="color: white; margin: 0; font-size: 1.1rem; font-weight: 500;">
+                                <span style="background: rgba(255, 255, 255, 0.3); padding: 0.25rem 0.5rem; border-radius: 0.25rem; margin-right: 0.5rem;">
+                                    Event {selected_event['number']}
+                                </span>
+                                {format_timestamp_readable(selected_timestamp)}
+                            </p>
+                            <p style="color: #e5e7eb; margin: 0.5rem 0 0 0; font-size: 0.95rem;">
+                                📊 Contains {selected_event['properties_count']} motor data properties
+                            </p>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Modern action buttons with spacing
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    col1, col2, col3 = st.columns([1, 2, 1])
+                    
+                    with col1:
+                        if st.button("🔙 Back to Dashboard", use_container_width=True, help="Return to main dashboard"):
+                            st.session_state.show_event_browser = False
+                            if 'event_page' in st.session_state:
+                                del st.session_state.event_page  # Reset pagination
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button("📥 Download & Analyze Event", use_container_width=True, type="primary", help="Download this event data and return to dashboard"):
+                            with st.spinner("📥 Downloading motor data..."):
+                                success, output = fetch_specific_event_data(person_id, selected_timestamp)
+                            
+                            if success:
+                                st.session_state.show_event_browser = False
+                                if 'event_page' in st.session_state:
+                                    del st.session_state.event_page  # Reset pagination
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Download failed: {output}")
+                                st.info("💡 Try selecting a different event or refresh the list.")
+                    
+                    with col3:
+                        if st.button("🔄 Refresh", use_container_width=True, help="Refresh the event list"):
+                            if 'event_page' in st.session_state:
+                                del st.session_state.event_page  # Reset pagination
+                            st.rerun()
+                else:
+                    st.warning("No events available on this page.")
             
-            # Get the selected event index
-            selected_idx = event_options.index(selected_option)
-            selected_event = formatted_events[selected_idx]
-            selected_timestamp = selected_event['timestamp']
-            
-            # Modern selected event card with gradient background
-            st.markdown(f"""
-            <div style="
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                border-radius: 1rem;
-                padding: 1.5rem;
-                margin: 1.5rem 0;
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            ">
-                <h3 style="color: white; margin: 0 0 0.5rem 0; font-size: 1.25rem;">
-                    📋 Selected Event
-                </h3>
-                <div style="
-                    background: rgba(255, 255, 255, 0.2);
-                    border-radius: 0.5rem;
-                    padding: 1rem;
-                    backdrop-filter: blur(10px);
-                ">
-                    <p style="color: white; margin: 0; font-size: 1.1rem; font-weight: 500;">
-                        <span style="background: rgba(255, 255, 255, 0.3); padding: 0.25rem 0.5rem; border-radius: 0.25rem; margin-right: 0.5rem;">
-                            Event {selected_event['number']}
-                        </span>
-                        {format_timestamp_readable(selected_timestamp)}
-                    </p>
-                    <p style="color: #e5e7eb; margin: 0.5rem 0 0 0; font-size: 0.95rem;">
-                        📊 Contains {selected_event['properties_count']} motor data properties
-                    </p>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Modern action buttons with spacing
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            col1, col2, col3 = st.columns([1, 2, 1])
+            # Pagination controls at the bottom (same as top)
+            st.markdown("---")
+            col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
             
             with col1:
-                if st.button("🔙 Back to Dashboard", use_container_width=True, help="Return to main dashboard"):
-                    st.session_state.show_event_browser = False
+                if st.button("⏮️ First ", disabled=(current_page == 0), key="first_bottom"):
+                    st.session_state.event_page = 0
                     st.rerun()
             
             with col2:
-                if st.button("📥 Download & Analyze Event", use_container_width=True, type="primary", help="Download this event data and return to dashboard"):
-                    with st.spinner("📥 Downloading motor data..."):
-                        success, output = fetch_specific_event_data(person_id, selected_timestamp)
-                    
-                    if success:
-                        st.session_state.show_event_browser = False
-                        st.rerun()
-                    else:
-                        st.error(f"❌ Download failed: {output}")
-                        st.info("💡 Try selecting a different event or refresh the list.")
+                if st.button("◀️ Previous ", disabled=(current_page == 0), key="prev_bottom"):
+                    st.session_state.event_page = max(0, current_page - 1)
+                    st.rerun()
             
             with col3:
-                if st.button("🔄 Refresh", use_container_width=True, help="Refresh the event list"):
+                st.markdown(f"**Page {current_page + 1} of {total_pages}**")
+            
+            with col4:
+                if st.button("Next ▶️ ", disabled=(current_page >= total_pages - 1), key="next_bottom"):
+                    st.session_state.event_page = min(total_pages - 1, current_page + 1)
+                    st.rerun()
+            
+            with col5:
+                if st.button("Last ⏭️ ", disabled=(current_page >= total_pages - 1), key="last_bottom"):
+                    st.session_state.event_page = total_pages - 1
                     st.rerun()
         else:
             st.error("❌ No events found in the output")
