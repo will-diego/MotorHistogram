@@ -492,417 +492,92 @@ def main():
         show_login_page()
         return
     
-    # Add global CSS for dark theme with white text
+    # Add clean dark theme CSS
     st.markdown("""
     <style>
-    /* Dark theme - overall app background */
+    /* Clean dark theme */
     .stApp {
-        background-color: #0f172a !important;
-        color: #f8fafc !important;
+        background-color: #0f172a;
+        color: #f8fafc;
     }
     
-    /* Main content area */
-    .main .block-container {
-        background-color: #0f172a !important;
-        color: #f8fafc !important;
+    /* Sidebar */
+    .stSidebar {
+        background-color: #1e293b;
     }
     
-    /* Fix all text to white */
-    .stMarkdown, .stText, p, span, div, label {
-        color: #f8fafc !important;
+    /* Buttons */
+    .stButton button {
+        background-color: #3b82f6;
+        color: white;
+        border: none;
     }
     
-    /* Tab styling - dark theme */
+    /* Tables */
+    .stDataFrame {
+        background-color: #1e293b;
+    }
+    
+    /* Text inputs */
+    .stSelectbox > div > div, .stTextInput > div > div > input {
+        background-color: #334155;
+        color: #f8fafc;
+    }
+    
+    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #1e293b !important;
-        border-bottom: 2px solid #475569 !important;
+        background-color: #1e293b;
     }
     
     .stTabs [data-baseweb="tab-list"] button {
-        background-color: #334155 !important;
-        color: #cbd5e1 !important;
-        border: 1px solid #475569 !important;
-        border-radius: 0.5rem 0.5rem 0 0 !important;
-        margin-right: 0.25rem !important;
+        background-color: #334155;
+        color: #cbd5e1;
     }
     
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
-        background-color: #0f172a !important;
-        color: #ffffff !important;
-        border-bottom: 2px solid #3b82f6 !important;
-    }
-    
-    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        color: #cbd5e1 !important;
-        font-weight: 600 !important;
-    }
-    
-    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] [data-testid="stMarkdownContainer"] p {
-        color: #ffffff !important;
-        font-weight: 700 !important;
-    }
-    
-    /* Tab content area */
-    .stTabs [data-baseweb="tab-panel"] {
-        background-color: #0f172a !important;
-        color: #f8fafc !important;
-        padding: 1rem !important;
-    }
-    
-    /* Force all tab content to dark theme */
-    .stTabs [data-baseweb="tab-panel"] > div {
-        background-color: #0f172a !important;
-        color: #f8fafc !important;
-    }
-    
-    /* Fix any nested content in tabs */
-    .stTabs [data-baseweb="tab-panel"] * {
-        color: #f8fafc !important;
-    }
-    
-    /* Override any light colored containers */
-    [data-testid="stVerticalBlock"], [data-testid="stHorizontalBlock"] {
-        background-color: transparent !important;
-    }
-    
-    /* Force block containers to be dark */
-    .block-container {
-        background-color: #0f172a !important;
-        color: #f8fafc !important;
-    }
-    
-    /* Fix any remaining white/light containers */
-    .element-container {
-        background-color: transparent !important;
-    }
-    
-    /* Override any stubborn light backgrounds */
-    .stContainer, .stColumn {
-        background-color: transparent !important;
-        color: #f8fafc !important;
-    }
-    
-    /* Make sure all divs in the main content are dark */
-    .main .block-container > div {
-        background-color: transparent !important;
-        color: #f8fafc !important;
-    }
-    
-    /* Force markdown and text elements to white */
-    .stMarkdown > div, .stText > div {
-        color: #f8fafc !important;
-        background-color: transparent !important;
-    }
-    
-    /* AGGRESSIVE: Target any remaining white backgrounds */
-    * {
-        background-color: transparent !important;
-    }
-    
-    /* Restore only the backgrounds we want */
-    .stApp {
-        background-color: #0f172a !important;
-    }
-    
-    [data-testid="metric-container"] {
-        background-color: #1e293b !important;
-    }
-    
-    .stDataFrame table {
-        background-color: #1e293b !important;
-    }
-    
-    .stDataFrame th {
-        background-color: #334155 !important;
-    }
-    
-    .stDataFrame td {
-        background-color: #1e293b !important;
-    }
-    
-    .stButton button {
-        background-color: #3b82f6 !important;
-    }
-    
-    .stSelectbox > div > div {
-        background-color: #334155 !important;
-    }
-    
-    .stTextInput > div > div > input {
-        background-color: #334155 !important;
-    }
-    
-    .streamlit-expanderHeader {
-        background-color: #334155 !important;
-    }
-    
-    .streamlit-expanderContent {
-        background-color: #1e293b !important;
-    }
-    
-    .stSidebar {
-        background-color: #1e293b !important;
-    }
-    
-    /* Force any stubborn containers to dark or transparent */
-    div:not(.stDataFrame):not(.stButton):not(.stSelectbox):not(.stTextInput):not(.streamlit-expanderHeader):not(.streamlit-expanderContent):not(.stSidebar):not([data-testid="metric-container"]) {
-        background-color: transparent !important;
-    }
-    
-    /* Last resort - force common Streamlit containers */
-    [class*="st"], [class*="streamlit"] {
-        background-color: transparent !important;
-    }
-    
-    /* Restore app background */
-    .stApp, .main, .block-container {
-        background-color: #0f172a !important;
-    }
-    
-    /* Sidebar dark theme */
-    .css-1d391kg, .css-1d391kg p, .stSidebar {
-        background-color: #1e293b !important;
-        color: #f8fafc !important;
-    }
-    
-    .stSidebar .stMarkdown {
-        color: #f8fafc !important;
-    }
-    
-    /* Metric containers - dark theme */
-    [data-testid="metric-container"] {
-        background-color: #1e293b !important;
-        border: 1px solid #475569 !important;
-        padding: 1rem !important;
-        border-radius: 0.5rem !important;
-        color: #f8fafc !important;
-    }
-    
-    [data-testid="metric-container"] > div {
-        color: #f8fafc !important;
-    }
-    
-    [data-testid="metric-container"] [data-testid="stMetricValue"] {
-        color: #ffffff !important;
-        font-size: 1.5rem !important;
-        font-weight: 700 !important;
-    }
-    
-    [data-testid="metric-container"] [data-testid="stMetricLabel"] {
-        color: #cbd5e1 !important;
-        font-weight: 600 !important;
-    }
-    
-    /* Dark dataframe styling */
-    .stDataFrame {
-        border: 2px solid #475569 !important;
-        border-radius: 0.5rem !important;
-        background-color: #1e293b !important;
-    }
-    
-    .stDataFrame table {
-        background-color: #1e293b !important;
-        color: #f8fafc !important;
-    }
-    
-    .stDataFrame th {
-        background-color: #334155 !important;
-        color: #ffffff !important;
-        font-weight: 600 !important;
-        border-bottom: 2px solid #475569 !important;
-    }
-    
-    .stDataFrame td {
-        color: #f8fafc !important;
-        border-bottom: 1px solid #475569 !important;
-        background-color: #1e293b !important;
-    }
-    
-    .stDataFrame tr:hover td {
-        background-color: #334155 !important;
-    }
-    
-    /* Button styling - dark theme */
-    .stButton button {
-        background-color: #3b82f6 !important;
-        color: #ffffff !important;
-        font-weight: 600 !important;
-        border: none !important;
-        border-radius: 0.5rem !important;
-    }
-    
-    .stButton button:hover {
-        background-color: #2563eb !important;
-    }
-    
-    /* Primary button (different color) */
-    .stButton button[kind="primary"] {
-        background-color: #10b981 !important;
-    }
-    
-    .stButton button[kind="primary"]:hover {
-        background-color: #059669 !important;
-    }
-    
-    /* Form elements - dark theme */
-    .stSelectbox > div > div {
-        background-color: #334155 !important;
-        color: #f8fafc !important;
-        border: 1px solid #475569 !important;
-    }
-    
-    .stTextInput > div > div > input {
-        background-color: #334155 !important;
-        color: #f8fafc !important;
-        border: 1px solid #475569 !important;
-    }
-    
-    /* Expander styling - dark theme */
-    .streamlit-expanderHeader {
-        background-color: #334155 !important;
-        color: #f8fafc !important;
-        font-weight: 600 !important;
-        border: 1px solid #475569 !important;
-        border-radius: 0.5rem !important;
-    }
-    
-    .streamlit-expanderContent {
-        background-color: #1e293b !important;
-        border: 1px solid #475569 !important;
-        border-top: none !important;
-        border-radius: 0 0 0.5rem 0.5rem !important;
-    }
-    
-    /* Alert messages - dark theme versions */
-    .stAlert {
-        border-radius: 0.5rem !important;
-        border: 1px solid !important;
-    }
-    
-    .stSuccess {
-        background-color: #064e3b !important;
-        color: #10b981 !important;
-        border-color: #10b981 !important;
-    }
-    
-    .stError {
-        background-color: #7f1d1d !important;
-        color: #ef4444 !important;
-        border-color: #ef4444 !important;
-    }
-    
-    .stInfo {
-        background-color: #1e3a8a !important;
-        color: #3b82f6 !important;
-        border-color: #3b82f6 !important;
-    }
-    
-    .stWarning {
-        background-color: #92400e !important;
-        color: #f59e0b !important;
-        border-color: #f59e0b !important;
-    }
-    
-    /* Spinner styling */
-    .stSpinner > div {
-        color: #f8fafc !important;
-    }
-    
-    /* Headers - bright white for contrast */
-    h1, h2, h3, h4, h5, h6 {
-        color: #ffffff !important;
-        font-weight: 700 !important;
-    }
-    
-    /* Code blocks - dark theme */
-    .stCode {
-        background-color: #334155 !important;
-        color: #f8fafc !important;
-        border: 1px solid #475569 !important;
-    }
-    
-    /* Custom card styling for gradient cards */
-    .custom-card {
-        background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%) !important;
-        border-radius: 1rem !important;
-        padding: 1.5rem !important;
-        margin: 1rem 0 !important;
-        border: 1px solid #475569 !important;
-    }
-    
-    /* Fix any remaining light backgrounds */
-    .css-1v0mbdj, .css-1v0mbdj p {
-        background-color: #0f172a !important;
-        color: #f8fafc !important;
-    }
-    
-    /* Login page styling */
-    .login-container {
-        background-color: #1e293b !important;
-        border: 1px solid #475569 !important;
-        border-radius: 1rem !important;
-    }
-    
-    /* Progress bars */
-    .stProgress > div > div {
-        background-color: #3b82f6 !important;
-    }
-    
-    /* Markdown containers */
-    [data-testid="stMarkdownContainer"] {
-        color: #f8fafc !important;
-    }
-    
-    /* Column containers */
-    [data-testid="column"] {
-        background-color: transparent !important;
+        background-color: #0f172a;
+        color: #ffffff;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # Header with user info and logout
+    # Load data
+    csv_data = load_available_data()
+    histogram_data = load_histogram_data()
+
+    # Header with user info
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.title("🚗 Motor Data Analysis Dashboard")
-        st.markdown("### Interactive analysis of PostHog motor data with real-time visualization")
-
+        st.title("🏎️ Motor Data Analysis Dashboard")
     with col2:
-        st.markdown(f"**👤 Welcome, {st.session_state.username}**")
-        if st.button("🚪 Logout", key="logout_button"):
+        username = st.session_state.get('username', 'Unknown')
+        st.markdown(f"**👤 Logged in as: {username}**")
+        if st.button("🚪 Logout"):
             logout()
-    
-    # Sidebar
-    st.sidebar.title("🔧 Control Panel")
-    
-    # User info in sidebar
-    st.sidebar.markdown(f"""
-    <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
-        <p style="margin: 0; color: #0c4a6e; font-weight: 600;">
-            👤 Logged in as: <strong>{st.session_state.username}</strong>
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Data Collection Section
-    st.sidebar.header("📥 Data Collection")
-    
-    with st.sidebar.expander("Fetch New Data", expanded=True):
-        person_id = st.text_input(
-            "Person ID", 
-            value="0197a976-e0dd-707e-8eef-104d3d3a24a5",
-            help="Enter the PostHog person ID to fetch data for"
-        )
-        
-        if st.button("🔍 Browse Events", use_container_width=True):
-            # Show loading state
-            with st.spinner("🔍 Searching for recent motor data events..."):
-                # Store the person ID in session state and trigger event browsing
-                st.session_state.person_id = person_id
-                st.session_state.show_event_browser = True
-                # Small delay to show the spinner
-                import time
-                time.sleep(0.5)
             st.rerun()
+
+    # Sidebar
+    with st.sidebar:
+        st.header("🔧 Control Panel")
+        
+        st.markdown(f"**👤 Logged in as: {username}**")
+        
+        st.header("📊 Data Collection")
+        
+        with st.expander("Fetch New Data", expanded=False):
+            st.text("Person ID")
+            person_id = st.text_input("", value="0197a976-e0dd-707e-9c85-a734005b1f85", label_visibility="collapsed")
+            
+            if st.button("🔍 Browse Events"):
+                # Show loading state
+                with st.spinner("🔍 Searching for recent motor data events..."):
+                    # Store the person ID in session state and trigger event browsing
+                    st.session_state.person_id = person_id
+                    st.session_state.show_event_browser = True
+                    # Small delay to show the spinner
+                    import time
+                    time.sleep(0.5)
+                st.rerun()
         
         if st.button("📊 Generate Charts", use_container_width=True):
             success, output = run_histogram_generation()
@@ -1112,66 +787,6 @@ def main():
         
         return  # Don't show the main dashboard when browsing events
     
-    # Load available data
-    csv_data = load_available_data()
-    histogram_data = load_histogram_data()
-    
-    # Show welcome screen when no data is available
-    if not csv_data and not histogram_data:
-        st.markdown("---")
-        
-        # Welcome message
-        st.markdown("""
-        ### 👋 Welcome to the Motor Data Analysis Dashboard!
-        
-        **Getting Started:**
-        1. 🔍 Click **'Browse Events'** in the sidebar to see recent motor data events
-        2. 📅 Select an event from the list (timestamps are shown in readable format)
-        3. 📥 Click **'Fetch This Event'** to download the data
-        4. 📊 Generate charts and explore your data!
-        
-        **Features:**
-        - 📈 **Interactive Charts** - Dynamic visualizations with Plotly
-        - 📋 **Raw Data Explorer** - Browse and download your data
-        - ⚙️ **Settings** - File management and system information
-        """)
-        
-        # Quick start section
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("""
-            #### 🚀 Quick Start
-            
-            Ready to analyze your motor data? Start by browsing available events using the sidebar controls.
-            
-            The system will automatically categorize your data into:
-            - ⚡ **Power** measurements
-            - 🔄 **Torque** readings  
-            - 🌡️ **Temperature** data (Motor & MOSFET)
-            - ❄️ **Cooldown** metrics
-            """)
-        
-        with col2:
-            st.markdown("""
-            #### 📊 What You'll Get
-            
-            Once you've loaded data, you'll see:
-            - **Overview** - Summary statistics and metrics
-            - **Interactive Charts** - Zoomable, filterable visualizations
-            - **Raw Data** - Full data tables with export options
-            - **Settings** - File management and technical details
-            """)
-        
-        # Center the browse events button
-        st.markdown("---")
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown("### 🎯 Ready to start?")
-            st.info("Use the **'🔍 Browse Events'** button in the sidebar to get started!")
-        
-        return
-    
     # Main dashboard tabs
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "📈 Interactive Charts", "📋 Raw Data", "⚙️ Settings"])
     
@@ -1179,21 +794,25 @@ def main():
         st.header("📊 Data Overview")
         
         if csv_data:
-            # Summary metrics
+            # Summary information as simple text
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
-                st.metric("📁 Data Categories", len(csv_data))
+                st.markdown("**📁 Data Categories**")
+                st.markdown(f"**{len(csv_data)}**")
             
             with col2:
                 total_properties = sum(len(df.columns) - 1 for df in csv_data.values())  # -1 for timestamp
-                st.metric("🔧 Total Properties", total_properties)
+                st.markdown("**🔧 Total Properties**")
+                st.markdown(f"**{total_properties}**")
             
             with col3:
                 if histogram_data:
-                    st.metric("📊 Generated Charts", len(histogram_data))
+                    st.markdown("**📊 Generated Charts**")
+                    st.markdown(f"**{len(histogram_data)}**")
                 else:
-                    st.metric("📊 Generated Charts", 0)
+                    st.markdown("**📊 Generated Charts**")
+                    st.markdown("**0**")
             
             with col4:
                 # Show timestamp of latest data
@@ -1204,9 +823,11 @@ def main():
                         break
                 
                 if latest_timestamp:
-                    st.metric("🕐 Latest Data", latest_timestamp[:16])
+                    st.markdown("**🕐 Latest Data**")
+                    st.markdown(f"**{latest_timestamp[:16]}**")
                 else:
-                    st.metric("🕐 Latest Data", "Unknown")
+                    st.markdown("**🕐 Latest Data**")
+                    st.markdown("**Unknown**")
         
         # Show available data categories
         st.subheader("Available Data Categories")
@@ -1253,10 +874,10 @@ def main():
                     
                     with col2:
                         st.markdown("**📊 Statistics**")
-                        st.metric("Min Value", f"{df['Value'].min():.1f}")
-                        st.metric("Max Value", f"{df['Value'].max():.1f}")
-                        st.metric("Average", f"{df['Value'].mean():.1f}")
-                        st.metric("Properties", len(df))
+                        st.markdown(f"**Min Value:** {df['Value'].min():.1f}")
+                        st.markdown(f"**Max Value:** {df['Value'].max():.1f}")
+                        st.markdown(f"**Average:** {df['Value'].mean():.1f}")
+                        st.markdown(f"**Properties:** {len(df)}")
                         
                         # Show min/max properties
                         min_idx = df['Value'].idxmin()
@@ -1297,15 +918,21 @@ def main():
                 
                 st.subheader(f"Raw Data: {selected_category.replace('_', ' ').title()}")
                 
-                # Show data info
+                # Show data info as simple text
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Rows", len(df))
+                    st.markdown("**Rows**")
+                    st.markdown(f"**{len(df)}**")
                 with col2:
-                    st.metric("Columns", len(df.columns))
+                    st.markdown("**Columns**")
+                    st.markdown(f"**{len(df.columns)}**")
                 with col3:
+                    st.markdown("**Timestamp**")
                     if 'timestamp' in df.columns:
-                        st.metric("Timestamp", df['timestamp'].iloc[0] if not df.empty else "N/A")
+                        timestamp_val = df['timestamp'].iloc[0] if not df.empty else "N/A"
+                        st.markdown(f"**{timestamp_val}**")
+                    else:
+                        st.markdown("**N/A**")
                 
                 # Display data
                 st.dataframe(df, use_container_width=True)
