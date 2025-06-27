@@ -331,27 +331,14 @@ def fetch_events_list(person_id):
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
         
         if result.returncode == 0:
-            # Debug: Show what we got from the script
-            st.info(f"🔧 Debug - Script output length: {len(result.stdout)} characters")
-            if len(result.stdout) > 0:
-                # Show first few lines for debugging
-                lines = result.stdout.split('\n')[:10]
-                st.info(f"🔧 Debug - First 10 lines of output:")
-                for i, line in enumerate(lines):
-                    if line.strip():
-                        st.code(f"Line {i+1}: {line}")
-            
             # Parse the output to extract events
             events = parse_events_from_output(result.stdout)
-            st.info(f"🔧 Debug - Parsed {len(events)} events from output")
             
             return True, events
         else:
             st.error(f"Failed to fetch events (exit code {result.returncode})")
             if result.stderr:
                 st.error(f"Error details: {result.stderr}")
-            if result.stdout:
-                st.info(f"Script output: {result.stdout}")
             return False, []
     except Exception as e:
         st.error(f"Failed to fetch events: {str(e)}")
@@ -367,26 +354,15 @@ def fetch_specific_event_data(person_id, timestamp):
         # Use sys.executable to ensure same Python environment
         cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", timestamp, "-s", ""]
         
-        st.info(f"🔧 Debug - Downloading event: {timestamp}")
-        st.info(f"🔧 Debug - Command: {' '.join(cmd)}")
-        
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=".", timeout=60)
-        
-        st.info(f"🔧 Debug - Exit code: {result.returncode}")
-        if result.stdout:
-            st.info(f"🔧 Debug - Output length: {len(result.stdout)} characters")
-        if result.stderr:
-            st.info(f"🔧 Debug - Error output: {result.stderr[:200]}...")
         
         if result.returncode == 0:
             st.success("✅ Event data downloaded successfully!")
             return True, "Event data fetched successfully!"
         else:
-            st.error(f"❌ Failed to download event data (exit code: {result.returncode})")
+            st.error(f"❌ Failed to download event data")
             if result.stderr:
                 st.error(f"Error details: {result.stderr}")
-            if result.stdout:
-                st.info(f"Script output: {result.stdout}")
             return False, f"Error: {result.stderr or 'Unknown error'}"
     except subprocess.TimeoutExpired:
         st.error("⏰ Download timed out after 60 seconds")
@@ -406,28 +382,11 @@ def run_data_collection(person_id, session_id=None, timestamp=None):
         cmd.extend(["-t", timestamp])
     
     try:
-        # Debug: show the command being run (truncate long arguments)
-        cmd_display = []
-        for arg in cmd:
-            if len(arg) > 50:
-                cmd_display.append(arg[:50] + "...")
-            else:
-                cmd_display.append(arg)
-        st.info(f"🔧 Running command: {' '.join(cmd_display)}")
-        
         with st.spinner("Downloading data from PostHog..."):
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         st.success("✅ Data downloaded successfully!")
         return True, result.stdout
     except subprocess.CalledProcessError as e:
-        # Show both stdout and stderr for debugging
-        st.error(f"❌ Error downloading data:")
-        st.code(f"Exit code: {e.returncode}")
-        if e.stdout:
-            st.code(f"STDOUT:\n{e.stdout}")
-        if e.stderr:
-            st.code(f"STDERR:\n{e.stderr}")
-        
         # Check if it's a timestamp not found issue
         if "No event found with timestamp matching" in str(e.stdout):
             st.warning("⚠️ Timestamp not found in available data.")
@@ -460,6 +419,7 @@ def run_data_collection(person_id, session_id=None, timestamp=None):
             st.info("💡 Check the CSV outputs folder to see if data was downloaded.")
             return True, e.stderr
         else:
+            st.error(f"❌ Error downloading data:")
             return False, e.stderr
 
 def run_histogram_generation():
