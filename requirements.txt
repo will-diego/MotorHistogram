@@ -1,8 +1,7 @@
-requests==2.31.0
-pandas==2.1.4
-matplotlib==3.8.2
-numpy==1.26.3
-streamlit==1.29.0
-plotly==5.18.0
-pytz==2023.3
-urllib3==2.1.0 
+requests
+pandas
+matplotlib
+numpy
+streamlit
+plotly
+pytz 
