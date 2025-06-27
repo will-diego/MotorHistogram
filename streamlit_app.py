@@ -1058,11 +1058,18 @@ def main():
         st.subheader("Available Data Categories")
         
         if csv_data:
+            # Get master CSV file size
+            master_csv_file = "csv_outputs/motor_data_master.csv"
+            master_size = 0
+            if os.path.exists(master_csv_file):
+                master_size = os.path.getsize(master_csv_file) / 1024
+            
             categories_df = pd.DataFrame([
                 {
                     "Category": category.replace("_", " ").title(),
                     "Properties": len(df.columns) - 1,  # -1 for timestamp
-                    "File Size": f"{os.path.getsize(f'csv_outputs/posthog_event_{category}.csv') / 1024:.1f} KB"
+                    "Rows": len(df),
+                    "Master CSV Size": f"{master_size:.1f} KB" if master_size > 0 else "N/A"
                 }
                 for category, df in csv_data.items()
             ])
