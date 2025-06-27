@@ -226,21 +226,31 @@ def create_chart(chart_data, category_name, category_info, output_dir, figure_si
     """Create and save a chart for the given category data"""
     
     try:
-        # Extract data for plotting
-        indices = [item['index'] for item in chart_data]
-        values = [item['value'] for item in chart_data]
-        columns = [item['column'] for item in chart_data]
+        # Create complete range based on category
+        if 'torque' in category_name:
+            # Torque: show from 2 to 90 (every 2 units: 2, 4, 6, 8... 90)
+            full_range = list(range(2, 91, 2))
+        elif 'power' in category_name:
+            # Power: show from 25 to 800 (every 25 units: 25, 50, 75... 800)
+            full_range = list(range(25, 801, 25))
+        else:
+            # Temperature: use the actual data indices
+            full_range = sorted([item['index'] for item in chart_data])
+        
+        # Create value array for full range
+        data_dict = {item['index']: item['value'] for item in chart_data}
+        full_values = [data_dict.get(idx, 0) for idx in full_range]  # Use 0 for missing indices
         
         # Create the figure
         fig, ax = plt.subplots(1, 1, figsize=figure_size)
         
-        # Create bar chart
-        bars = ax.bar(range(len(indices)), values, alpha=0.8, edgecolor='black', linewidth=0.5)
+        # Create bar chart for full range
+        bars = ax.bar(range(len(full_range)), full_values, alpha=0.8, edgecolor='black', linewidth=0.5)
         
         # Color bars with gradient
-        if len(values) > 1:
+        if len(full_values) > 1:
             # Normalize values for coloring
-            norm_values = np.array(values)
+            norm_values = np.array(full_values)
             norm_values = (norm_values - norm_values.min()) / (norm_values.max() - norm_values.min() + 1e-8)
             colors = plt.cm.get_cmap('viridis')(norm_values)
             for bar, color in zip(bars, colors):
@@ -253,12 +263,12 @@ def create_chart(chart_data, category_name, category_info, output_dir, figure_si
         ax.grid(True, alpha=0.3, axis='y')
         
         # Set x-axis labels
-        ax.set_xticks(range(len(indices)))
+        ax.set_xticks(range(len(full_range)))
         if 'torque' in category_name:
-            labels = [f'{idx:02d}' for idx in indices]
+            labels = [f'{idx:02d}' for idx in full_range]
         else:
             labels = []
-            for idx in indices:
+            for idx in full_range:
                 if idx == -1:
                     labels.append('Low')
                 elif idx == 999:
@@ -268,18 +278,24 @@ def create_chart(chart_data, category_name, category_info, output_dir, figure_si
         
         ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=10)
         
-        # Add value labels on bars
-        for bar, value in zip(bars, values):
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height + max(values)*0.01,
-                   f'{value:.0f}', ha='center', va='bottom', fontsize=9)
+        # Add value labels on bars (only for non-zero values to avoid clutter)
+        max_val = max(full_values) if full_values else 1
+        for bar, value in zip(bars, full_values):
+            if value > 0:  # Only show labels for non-zero values
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height + max_val*0.01,
+                       f'{value:.0f}', ha='center', va='bottom', fontsize=9)
         
-        # Add statistics box
+        # Add statistics box (only for actual data, not zeros)
+        actual_values = [v for v in full_values if v > 0]
         stats_text = f'Properties: {len(chart_data)}\n'
-        stats_text += f'Min: {min(values):.1f}\n'
-        stats_text += f'Max: {max(values):.1f}\n'
-        stats_text += f'Avg: {np.mean(values):.1f}\n'
-        stats_text += f'Sum: {sum(values):.1f}'
+        if actual_values:
+            stats_text += f'Min: {min(actual_values):.1f}\n'
+            stats_text += f'Max: {max(actual_values):.1f}\n'
+            stats_text += f'Avg: {np.mean(actual_values):.1f}\n'
+            stats_text += f'Sum: {sum(actual_values):.1f}'
+        else:
+            stats_text += 'No non-zero values'
         
         ax.text(0.98, 0.98, stats_text, transform=ax.transAxes,
                bbox=dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.9),
