@@ -1206,46 +1206,35 @@ def main():
         st.header("📈 Interactive Data Visualization")
         
         if histogram_data:
-            # Category selector
-            selected_categories = st.multiselect(
-                "Select categories to visualize:",
-                options=list(histogram_data.keys()),
-                default=list(histogram_data.keys())[:2] if len(histogram_data) >= 2 else list(histogram_data.keys()),
-                format_func=lambda x: x.replace("_", " ").title()
-            )
-            
-            if selected_categories:
-                # Display charts
-                for category in selected_categories:
-                    st.subheader(f"{category.replace('_', ' ').title()} Analysis")
+            # Display all charts automatically
+            for category in histogram_data.keys():
+                st.subheader(f"{category.replace('_', ' ').title()} Analysis")
+                
+                df = histogram_data[category]
+                
+                # Create columns for chart and stats
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    fig = create_interactive_histogram(df, category)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    st.markdown("**📊 Statistics**")
+                    st.markdown(f"**Min Value:** {df['Value'].min():.1f}")
+                    st.markdown(f"**Max Value:** {df['Value'].max():.1f}")
+                    st.markdown(f"**Average:** {df['Value'].mean():.1f}")
+                    st.markdown(f"**Properties:** {len(df)}")
                     
-                    df = histogram_data[category]
+                    # Show min/max properties
+                    min_idx = df['Value'].idxmin()
+                    max_idx = df['Value'].idxmax()
                     
-                    # Create columns for chart and stats
-                    col1, col2 = st.columns([3, 1])
-                    
-                    with col1:
-                        fig = create_interactive_histogram(df, category)
-                        st.plotly_chart(fig, use_container_width=True)
-                    
-                    with col2:
-                        st.markdown("**📊 Statistics**")
-                        st.markdown(f"**Min Value:** {df['Value'].min():.1f}")
-                        st.markdown(f"**Max Value:** {df['Value'].max():.1f}")
-                        st.markdown(f"**Average:** {df['Value'].mean():.1f}")
-                        st.markdown(f"**Properties:** {len(df)}")
-                        
-                        # Show min/max properties
-                        min_idx = df['Value'].idxmin()
-                        max_idx = df['Value'].idxmax()
-                        
-                        st.markdown("**🔍 Extremes**")
-                        st.markdown(f"**Min:** Index {df.loc[min_idx, 'Numeric_Label']}")
-                        st.markdown(f"**Max:** Index {df.loc[max_idx, 'Numeric_Label']}")
-                    
-                    st.divider()
-            else:
-                st.info("Select categories to view their visualizations")
+                    st.markdown("**🔍 Extremes**")
+                    st.markdown(f"**Min:** Index {df.loc[min_idx, 'Numeric_Label']}")
+                    st.markdown(f"**Max:** Index {df.loc[max_idx, 'Numeric_Label']}")
+                
+                st.divider()
         else:
             st.warning("⚠️ No interactive histogram data available. Generate charts using the sidebar.")
             
