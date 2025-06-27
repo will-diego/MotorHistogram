@@ -162,34 +162,51 @@ def format_timestamp_readable(timestamp_str):
         return timestamp_str
 
 def load_available_data():
-    """Load all available CSV data files"""
-    data = {}
-    csv_pattern = "csv_outputs/posthog_event_*.csv"
-    csv_files = glob.glob(csv_pattern)
+    """Load available CSV data from master file"""
+    master_csv_file = "csv_outputs/motor_data_master.csv"
     
-    # Only load data if it exists AND we're not in initial empty state
-    if not csv_files:
+    # Check if master CSV exists and has content
+    if not os.path.exists(master_csv_file) or os.path.getsize(master_csv_file) < 100:
         return {}
     
-    # Check if files are very small (just headers) and skip if so
-    for file_path in csv_files:
-        try:
-            # Check file size - if less than 100 bytes, probably just headers
-            if os.path.getsize(file_path) < 100:
-                continue
-                
-            df = pd.read_csv(file_path)
-            if len(df) == 0:  # Empty dataframe
-                continue
-                
-            # Extract category name from filename
-            filename = os.path.basename(file_path)
-            category = filename.replace("posthog_event_", "").replace(".csv", "")
-            data[category] = df
-        except Exception as e:
-            st.warning(f"Could not load {file_path}: {e}")
-    
-    return data
+    try:
+        df = pd.read_csv(master_csv_file)
+        if df.empty:
+            return {}
+        
+        # Categorize the data by property types
+        categorized_data = {}
+        
+        # Get all columns except timestamp
+        all_columns = [col for col in df.columns if col != 'timestamp']
+        
+        # Create category dataframes
+        power_cols = [col for col in all_columns if col.lower().startswith('power')]
+        torque_cols = [col for col in all_columns if col.lower().startswith('torque')]
+        motor_temp_cols = [col for col in all_columns if 'motortemp' in col.lower()]
+        mosfet_temp_cols = [col for col in all_columns if 'mosfettemp' in col.lower() and 'cooldown' not in col.lower()]
+        mosfet_cooldown_cols = [col for col in all_columns if ('mosfet' in col.lower() and 'cooldown' in col.lower()) or 'cooldownmosfet' in col.lower()]
+        motor_cooldown_cols = [col for col in all_columns if ('motor' in col.lower() and 'cooldown' in col.lower()) or 'cooldownmotor' in col.lower()]
+        
+        # Create category dataframes with timestamp
+        if power_cols:
+            categorized_data['power'] = df[['timestamp'] + power_cols].dropna(how='all', subset=power_cols)
+        if torque_cols:
+            categorized_data['torque'] = df[['timestamp'] + torque_cols].dropna(how='all', subset=torque_cols)
+        if motor_temp_cols:
+            categorized_data['motor_temp'] = df[['timestamp'] + motor_temp_cols].dropna(how='all', subset=motor_temp_cols)
+        if mosfet_temp_cols:
+            categorized_data['mosfet_temp'] = df[['timestamp'] + mosfet_temp_cols].dropna(how='all', subset=mosfet_temp_cols)
+        if mosfet_cooldown_cols:
+            categorized_data['mosfet_cooldown'] = df[['timestamp'] + mosfet_cooldown_cols].dropna(how='all', subset=mosfet_cooldown_cols)
+        if motor_cooldown_cols:
+            categorized_data['motor_cooldown'] = df[['timestamp'] + motor_cooldown_cols].dropna(how='all', subset=motor_cooldown_cols)
+        
+        return categorized_data
+        
+    except Exception as e:
+        st.warning(f"Could not load master CSV: {e}")
+        return {}
 
 def load_histogram_data():
     """Load histogram data files"""
@@ -345,8 +362,10 @@ def fetch_events_list(person_id):
         return False, []
 
 def fetch_specific_event_data(person_id, timestamp):
-    """Fetch data for a specific event timestamp"""
+    """Fetch data for a specific event timestamp and append to master CSV"""
     try:
+        import pandas as pd
+        
         # Ensure output directories exist
         os.makedirs("csv_outputs", exist_ok=True)
         os.makedirs("histogram_outputs", exist_ok=True)
@@ -357,8 +376,49 @@ def fetch_specific_event_data(person_id, timestamp):
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=".", timeout=60)
         
         if result.returncode == 0:
-            st.success("✅ Event data downloaded successfully!")
-            return True, "Event data fetched successfully!"
+            # Read the generated CSV files and combine into one row for master CSV
+            master_csv_file = "csv_outputs/motor_data_master.csv"
+            event_data = {"timestamp": timestamp}
+            
+            # Read all category files and combine properties
+            for category in ['power', 'torque', 'motor_temp', 'mosfet_temp', 'mosfet_cooldown', 'motor_cooldown']:
+                csv_file = f"csv_outputs/posthog_event_{category}.csv"
+                if os.path.exists(csv_file):
+                    try:
+                        df = pd.read_csv(csv_file)
+                        if not df.empty and len(df) > 0:
+                            # Add all properties from this category to the event data
+                            row_data = df.iloc[0].to_dict()
+                            for key, value in row_data.items():
+                                if key != 'timestamp' and pd.notna(value):
+                                    event_data[key] = value
+                        # Clean up the category file
+                        os.remove(csv_file)
+                    except Exception as e:
+                        st.warning(f"Warning: Could not read {csv_file}: {str(e)}")
+            
+            # Append to master CSV
+            if len(event_data) > 1:  # More than just timestamp
+                new_df = pd.DataFrame([event_data])
+                
+                if os.path.exists(master_csv_file):
+                    try:
+                        existing_df = pd.read_csv(master_csv_file)
+                        # Combine and remove duplicates
+                        combined_df = pd.concat([existing_df, new_df], ignore_index=True, sort=False)
+                        combined_df = combined_df.drop_duplicates(subset=['timestamp'], keep='last')
+                        combined_df.to_csv(master_csv_file, index=False)
+                    except Exception as e:
+                        st.warning(f"Error updating master CSV, creating new one: {str(e)}")
+                        new_df.to_csv(master_csv_file, index=False)
+                else:
+                    new_df.to_csv(master_csv_file, index=False)
+                
+                st.success("✅ Event data downloaded and added to master dataset!")
+                return True, "Event data fetched successfully!"
+            else:
+                st.warning("⚠️ No event data found to add")
+                return False, "No data found"
         else:
             st.error(f"❌ Failed to download event data")
             if result.stderr:
@@ -538,81 +598,60 @@ def fetch_bulk_events(person_id, event_count=None):
         status_text.empty()
         
         if success_count > 0:
-            # Process and combine all event data
-            status_text.text("Processing and combining data from all events...")
+            # Process and append all event data to master CSV
+            status_text.text("Processing and appending data to master CSV...")
             
-            # Initialize combined data structures
-            combined_data = {
-                'power': [],
-                'torque': [],
-                'motor_temp': [],
-                'mosfet_temp': [],
-                'mosfet_cooldown': [],
-                'motor_cooldown': []
-            }
+            master_csv_file = "csv_outputs/motor_data_master.csv"
+            new_rows = []
             
-            # Process each event's properties
+            # Process each event's properties into a single row
             for event_info in all_events_data:
                 timestamp = event_info['timestamp']
                 properties = event_info['properties']
                 
-                # Create data rows for this event
-                power_row = {"timestamp": timestamp}
-                torque_row = {"timestamp": timestamp}
-                motor_temp_row = {"timestamp": timestamp}
-                mosfet_temp_row = {"timestamp": timestamp}
-                mosfet_cooldown_row = {"timestamp": timestamp}
-                motor_cooldown_row = {"timestamp": timestamp}
-                
-                # Categorize properties
-                for key, value in properties.items():
-                    key_lower = key.lower()
-                    
-                    if key_lower.startswith('power'):
-                        power_row[key] = value
-                    elif key_lower.startswith('torque'):
-                        torque_row[key] = value
-                    elif 'motortemp' in key_lower:
-                        motor_temp_row[key] = value
-                    elif 'mosfettemp' in key_lower and 'cooldown' not in key_lower:
-                        mosfet_temp_row[key] = value
-                    elif 'mosfet' in key_lower and 'cooldown' in key_lower:
-                        mosfet_cooldown_row[key] = value
-                    elif 'cooldownmosfet' in key_lower:
-                        mosfet_cooldown_row[key] = value
-                    elif 'motor' in key_lower and 'cooldown' in key_lower:
-                        motor_cooldown_row[key] = value
-                    elif 'cooldownmotor' in key_lower:
-                        motor_cooldown_row[key] = value
-                
-                # Add rows to combined data if they have properties
-                if len(power_row) > 1:
-                    combined_data['power'].append(power_row)
-                if len(torque_row) > 1:
-                    combined_data['torque'].append(torque_row)
-                if len(motor_temp_row) > 1:
-                    combined_data['motor_temp'].append(motor_temp_row)
-                if len(mosfet_temp_row) > 1:
-                    combined_data['mosfet_temp'].append(mosfet_temp_row)
-                if len(mosfet_cooldown_row) > 1:
-                    combined_data['mosfet_cooldown'].append(mosfet_cooldown_row)
-                if len(motor_cooldown_row) > 1:
-                    combined_data['motor_cooldown'].append(motor_cooldown_row)
+                # Create a single row with timestamp and all properties
+                row = {"timestamp": timestamp}
+                row.update(properties)  # Add all properties to the row
+                new_rows.append(row)
             
-            # Save combined data to CSV files
-            for category, rows in combined_data.items():
-                if rows:
-                    df = pd.DataFrame(rows)
-                    csv_file = f"csv_outputs/posthog_event_{category}.csv"
-                    df.to_csv(csv_file, index=False)
-                    
-                    # Calculate total properties for this category
-                    total_properties = sum(len(row) - 1 for row in rows)  # -1 for timestamp
-                    st.info(f"📊 Combined {category}: {len(rows)} rows, {total_properties} total properties from {success_count} events")
+            if new_rows:
+                new_df = pd.DataFrame(new_rows)
+                
+                # Check if master CSV exists and append, otherwise create new
+                if os.path.exists(master_csv_file):
+                    try:
+                        existing_df = pd.read_csv(master_csv_file)
+                        # Combine existing and new data
+                        combined_df = pd.concat([existing_df, new_df], ignore_index=True, sort=False)
+                        # Remove duplicates based on timestamp
+                        combined_df = combined_df.drop_duplicates(subset=['timestamp'], keep='last')
+                        combined_df.to_csv(master_csv_file, index=False)
+                        st.info(f"📊 Appended {len(new_rows)} new events to master CSV (total: {len(combined_df)} events)")
+                    except Exception as e:
+                        st.warning(f"Error reading existing CSV, creating new one: {str(e)}")
+                        new_df.to_csv(master_csv_file, index=False)
+                        st.info(f"📊 Created new master CSV with {len(new_rows)} events")
+                else:
+                    # Create new master CSV
+                    new_df.to_csv(master_csv_file, index=False)
+                    st.info(f"📊 Created new master CSV with {len(new_rows)} events")
+                
+                # Clean up old category-specific CSV files
+                for category in ['power', 'torque', 'motor_temp', 'mosfet_temp', 'mosfet_cooldown', 'motor_cooldown']:
+                    old_csv = f"csv_outputs/posthog_event_{category}.csv"
+                    if os.path.exists(old_csv):
+                        try:
+                            os.remove(old_csv)
+                        except:
+                            pass  # Ignore errors when cleaning up
+                
+                # Show total properties info
+                total_properties = sum(len(row) - 1 for row in new_rows)  # -1 for timestamp
+                st.info(f"📈 Added {total_properties} total properties from {success_count} events to master dataset")
             
             status_text.empty()
-            st.success(f"✅ Successfully combined {success_count}/{len(selected_events)} quality events! Combined data saved to CSV files.")
-            return True, f"Downloaded and combined {action_text} events successfully ({success_count}/{len(selected_events)} succeeded)"
+            st.success(f"✅ Successfully added {success_count}/{len(selected_events)} quality events to master CSV!")
+            return True, f"Downloaded and added {action_text} events successfully ({success_count}/{len(selected_events)} succeeded)"
         else:
             return False, "Failed to download any events"
     
