@@ -492,43 +492,45 @@ def fetch_bulk_events(person_id, event_count=None):
         # Initialize combined data structures with timestamps
         all_events_data = []
         
-        # Download each event and collect raw data
+        # Download each event and collect data immediately
         success_count = 0
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        # Use PostHog API directly to get raw event data
-        POSTHOG_API_KEY = os.getenv("POSTHOG_API_KEY")
-        PROJECT_ID = os.getenv("POSTHOG_PROJECT_ID", "113002")
-        headers = {"Authorization": f"Bearer {POSTHOG_API_KEY}", "Content-Type": "application/json"}
-        
         for i, event in enumerate(selected_events):
             progress = (i + 1) / len(selected_events)
             progress_bar.progress(progress)
-            status_text.text(f"Fetching event {i+1}/{len(selected_events)}: {event['timestamp'][:16]} ({event['properties_count']} properties)...")
+            status_text.text(f"Downloading event {i+1}/{len(selected_events)}: {event['timestamp'][:16]} ({event['properties_count']} properties)...")
             
-            try:
-                # Make direct API call to get this specific event
-                url = f"https://us.posthog.com/api/projects/{PROJECT_ID}/events/?event=Motor Data&person_id={person_id}&after={event['timestamp']}&before={event['timestamp']}&limit=1"
-                response = requests.get(url, headers=headers, timeout=30)
+            # Download individual event using the working GetPostHog.py script
+            event_cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", event['timestamp'], "-s", ""]
+            event_result = subprocess.run(event_cmd, capture_output=True, text=True, cwd=".", timeout=60)
+            
+            if event_result.returncode == 0:
+                # Immediately read and backup the generated CSV files before the next download overwrites them
+                event_data = {'timestamp': event['timestamp'], 'properties': {}}
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    if 'results' in data and data['results']:
-                        event_data = data['results'][0]
-                        all_events_data.append({
-                            'timestamp': event['timestamp'],
-                            'properties': event_data.get('properties', {}),
-                            'event_id': event_data.get('id', f'event_{i+1}')
-                        })
-                        success_count += 1
-                    else:
-                        st.warning(f"No data found for event {i+1}")
+                for category in ['power', 'torque', 'motor_temp', 'mosfet_temp', 'mosfet_cooldown', 'motor_cooldown']:
+                    csv_file = f"csv_outputs/posthog_event_{category}.csv"
+                    if os.path.exists(csv_file):
+                        try:
+                            df = pd.read_csv(csv_file)
+                            if not df.empty and len(df) > 0:
+                                # Convert the row data back to properties format
+                                row_data = df.iloc[0].to_dict()
+                                for key, value in row_data.items():
+                                    if key != 'timestamp' and pd.notna(value):
+                                        event_data['properties'][key] = value
+                        except Exception as e:
+                            st.warning(f"Warning: Could not read {csv_file} for event {i+1}: {str(e)}")
+                
+                if event_data['properties']:
+                    all_events_data.append(event_data)
+                    success_count += 1
                 else:
-                    st.warning(f"API error for event {i+1}: {response.status_code}")
-                    
-            except Exception as e:
-                st.warning(f"Error fetching event {i+1}: {str(e)}")
+                    st.warning(f"No data found for event {i+1}")
+            else:
+                st.warning(f"Failed to download event {i+1}: {event_result.stderr}")
                 continue
         
         # Clear progress indicators
