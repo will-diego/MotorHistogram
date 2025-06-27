@@ -12,82 +12,108 @@ import matplotlib.cm as cm
 import numpy as np
 
 # === CONFIG ===
-CSV_PATTERN = "csv_outputs/posthog_event_*.csv"
+MASTER_CSV = "csv_outputs/motor_data_master.csv"
 OUTPUT_DIR = "histogram_outputs"
 FIGURE_SIZE = (14, 8)
 
 # Create output directory if it doesn't exist
 Path(OUTPUT_DIR).mkdir(exist_ok=True)
 
-print("📊 Creating property value bar charts from PostHog event data...")
+print("📊 Creating property value bar charts from master motor data...")
 
-# Find all CSV files
-csv_files = glob.glob(CSV_PATTERN)
-if not csv_files:
-    print("❌ No CSV files found matching pattern:", CSV_PATTERN)
+# Check if master CSV exists
+if not os.path.exists(MASTER_CSV):
+    print(f"❌ Master CSV file not found: {MASTER_CSV}")
     exit(1)
 
-print(f"✅ Found {len(csv_files)} CSV files")
+print(f"✅ Found master CSV file: {MASTER_CSV}")
 
-for csv_file in csv_files:
-    print(f"\n🔍 Processing: {csv_file}")
+try:
+    # Read master CSV file
+    df = pd.read_csv(MASTER_CSV)
+    print(f"📊 Loaded {len(df)} rows from master CSV")
     
-    # Extract category name from filename
-    import os; category = os.path.basename(csv_file).replace("posthog_event_", "").replace(".csv", "")
-    category_title = category.replace("_", " ").title()
+    if len(df) == 0:
+        print("❌ Master CSV file is empty")
+        exit(1)
     
-    # Skip cooldown files for now
-    if 'cooldown' in category:
-        print(f"   ⏭️  Skipping cooldown category: {category}")
-        continue
+    # Define motor data categories
+    categories = {
+        'power': ['Motor.Power', 'motorpower'],
+        'torque': ['Motor.Torque', 'motortorque'],
+        'motor_temp': ['Motor.Temperature', 'motortemperature'],
+        'mosfet_temp': ['MOSFET.Temperature', 'mosfettemperature'], 
+        'motor_cooldown': ['Motor.Cooldown', 'motorcooldown'],
+        'mosfet_cooldown': ['MOSFET.Cooldown', 'mosfetcooldown']
+    }
     
-    try:
-        # Read CSV file
-        df = pd.read_csv(csv_file)
+    # Process each category
+    for category, keywords in categories.items():
+        print(f"\n🔍 Processing category: {category}")
         
-        # Get property names and their values (exclude timestamp)
-        property_data = []
+        # Skip cooldown files for now
+        if 'cooldown' in category:
+            print(f"   ⏭️  Skipping cooldown category: {category}")
+            continue
         
+        # Find columns that match this category
+        category_columns = []
         for col in df.columns:
             if col != 'timestamp':
+                col_lower = col.lower()
+                if any(keyword.lower() in col_lower for keyword in keywords):
+                    category_columns.append(col)
+        
+        if not category_columns:
+            print(f"   ❌ No columns found for category: {category}")
+            continue
+        
+        print(f"   ✅ Found {len(category_columns)} columns for {category}")
+        
+        # Use the most recent row (last row) for values
+        latest_row = df.iloc[-1]
+        
+        # Get property names and their values
+        property_data = []
+        
+        for col in category_columns:
+            try:
+                value = latest_row[col]
+                
+                # Try to convert to numeric
                 try:
-                    # Get the value for this property (should be only one row)
-                    value = df[col].iloc[0]  # Get first (and only) row value
-                    
-                    # Try to convert to numeric
-                    try:
-                        numeric_value = float(value)
-                        if not np.isnan(numeric_value):
-                            # Extract numeric suffix from property name
-                            if 'torque' in col.lower():
-                                # For torque, extract last 2 digits
-                                match = re.search(r'(\d{2})$', col)
-                                if match:
-                                    numeric_label = int(match.group(1))
-                                    property_data.append((numeric_label, numeric_value, col))
+                    numeric_value = float(value)
+                    if not np.isnan(numeric_value):
+                        # Extract numeric suffix from property name
+                        if 'torque' in col.lower():
+                            # For torque, extract last 2 digits
+                            match = re.search(r'(\d{2})$', col)
+                            if match:
+                                numeric_label = int(match.group(1))
+                                property_data.append((numeric_label, numeric_value, col))
+                        else:
+                            # For temp/power, extract last 3 digits or handle special .Low properties
+                            match = re.search(r'(\d{3})$', col)
+                            if match:
+                                numeric_label = int(match.group(1))
+                                property_data.append((numeric_label, numeric_value, col))
+                            elif col.lower().endswith('.low') and ('temp' in category):
+                                # Special case for temperature .Low properties (values < 20)
+                                numeric_label = -1  # Put at the beginning (before 020, 030, etc.)
+                                property_data.append((numeric_label, numeric_value, col))
+                                print(f"   ✅ Including temperature .Low property: {col}")
                             else:
-                                # For temp/power, extract last 3 digits or handle special .Low properties
-                                match = re.search(r'(\d{3})$', col)
-                                if match:
-                                    numeric_label = int(match.group(1))
-                                    property_data.append((numeric_label, numeric_value, col))
-                                elif col.lower().endswith('.low') and ('temp' in category):
-                                    # Special case for temperature .Low properties (values < 20)
-                                    numeric_label = -1  # Put at the beginning (before 020, 030, etc.)
-                                    property_data.append((numeric_label, numeric_value, col))
-                                    print(f"   ✅ Including temperature .Low property: {col}")
-                                else:
-                                    print(f"   ⚠️  Could not extract numeric suffix from: {col}")
-                    except (ValueError, TypeError):
-                        print(f"   ⚠️  Skipping non-numeric property: {col} = {value}")
-                        continue
-                        
-                except Exception as e:
-                    print(f"   ⚠️  Error processing column {col}: {e}")
+                                print(f"   ⚠️  Could not extract numeric suffix from: {col}")
+                except (ValueError, TypeError):
+                    print(f"   ⚠️  Skipping non-numeric property: {col} = {value}")
                     continue
+                    
+            except Exception as e:
+                print(f"   ⚠️  Error processing column {col}: {e}")
+                continue
         
         if not property_data:
-            print(f"   ❌ No valid properties found in {csv_file}")
+            print(f"   ❌ No valid properties found for category: {category}")
             continue
             
         # Sort by numeric label to get correct order
@@ -112,6 +138,7 @@ for csv_file in csv_files:
         bars = ax.bar(x_positions, property_values, alpha=0.8, edgecolor='black', linewidth=0.5)
         
         # Customize the plot
+        category_title = category.replace("_", " ").title()
         ax.set_title(f'{category_title} - Values by Numeric Index', fontsize=16, fontweight='bold', pad=20)
         if 'torque' in category:
             ax.set_xlabel('Torque Index (Last 2 Digits)', fontsize=14, fontweight='bold')
@@ -145,11 +172,11 @@ for csv_file in csv_files:
             else:
                 normalized_values = [0.5] * len(property_values)
             
-            colors = plt.cm.viridis(normalized_values)
+            colors = plt.cm.get_cmap('viridis')(normalized_values)
             for bar, color in zip(bars, colors):
                 bar.set_facecolor(color)
         else:
-            bars[0].set_facecolor(plt.cm.viridis(0.5))
+            bars[0].set_facecolor(plt.cm.get_cmap('viridis')(0.5))
         
         # Add value labels on top of bars
         max_value = max(property_values) if property_values else 0
@@ -197,9 +224,10 @@ for csv_file in csv_files:
         print(f"   📊 Saved property values: {values_file}")
         
         plt.close()  # Close to free memory
-        
-    except Exception as e:
-        print(f"   ❌ Error processing {csv_file}: {str(e)}")
+
+except Exception as e:
+    print(f"❌ Error processing master CSV: {str(e)}")
+    exit(1)
 
 print(f"\n🎉 Numeric indexed bar chart generation complete!")
 print(f"📁 Check the '{OUTPUT_DIR}' folder for your numeric indexed bar charts")
