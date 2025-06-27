@@ -63,6 +63,13 @@ headers = {
     "Content-Type": "application/json"
 }
 
+# Skip project discovery to avoid permission issues - we already know our project ID
+print("🔍 Using configured project ID (skipping discovery to avoid permission issues)...")
+print(f"✅ Using PROJECT_ID: {PROJECT_ID}")
+
+# Commenting out project discovery as it requires additional permissions
+# and we already have the correct project ID configured
+"""
 print("🔍 Discovering available projects...")
 try:
     response = requests.get(f"{INSTANCE_URL}/api/projects/", headers=headers)
@@ -90,6 +97,7 @@ try:
             print("   API key may not have project read permissions")
 except Exception as e:
     print(f"❌ Error fetching projects: {str(e)}")
+"""
 
 print()
 
