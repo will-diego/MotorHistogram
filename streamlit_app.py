@@ -1061,8 +1061,11 @@ def main():
             # Get master CSV file size
             master_csv_file = "csv_outputs/motor_data_master.csv"
             master_size = 0
-            if os.path.exists(master_csv_file):
-                master_size = os.path.getsize(master_csv_file) / 1024
+            try:
+                if os.path.exists(master_csv_file):
+                    master_size = os.path.getsize(master_csv_file) / 1024
+            except (FileNotFoundError, OSError):
+                master_size = 0
             
             categories_df = pd.DataFrame([
                 {
