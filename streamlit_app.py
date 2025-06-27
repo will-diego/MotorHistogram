@@ -277,6 +277,77 @@ def create_interactive_histogram(df, category):
     
     return fig
 
+def generate_charts_from_master_csv():
+    """Generate charts directly from master CSV as backup method"""
+    try:
+        master_csv = "csv_outputs/motor_data_master.csv"
+        if not os.path.exists(master_csv):
+            return False, "Master CSV not found"
+        
+        df = pd.read_csv(master_csv)
+        if df.empty:
+            return False, "Master CSV is empty"
+        
+        # Use latest row
+        latest_row = df.iloc[-1]
+        
+        # Define categories
+        categories = {
+            'power': ['power'],
+            'torque': ['torque'], 
+            'motor_temp': ['motortemperature'],
+            'mosfet_temp': ['mosfettemperature']
+        }
+        
+        charts_created = 0
+        
+        # Create output directory
+        os.makedirs("histogram_outputs", exist_ok=True)
+        
+        for category, keywords in categories.items():
+            # Find matching columns
+            category_cols = [col for col in df.columns 
+                           if any(keyword.lower() in col.lower() for keyword in keywords)
+                           and col != 'timestamp']
+            
+            if not category_cols:
+                continue
+                
+            # Extract numeric data
+            import re
+            property_data = []
+            for col in category_cols:
+                try:
+                    value = float(latest_row[col])
+                    if not pd.isna(value):
+                        if 'torque' in col.lower():
+                            match = re.search(r'(\d{2})$', col)
+                            if match:
+                                numeric_label = int(match.group(1))
+                                property_data.append((numeric_label, value, col))
+                        else:
+                            match = re.search(r'(\d{3})$', col) 
+                            if match:
+                                numeric_label = int(match.group(1))
+                                property_data.append((numeric_label, value, col))
+                except (ValueError, TypeError):
+                    continue
+            
+            if property_data:
+                # Sort and create CSV
+                property_data.sort(key=lambda x: x[0])
+                
+                # Create CSV file
+                csv_file = f"histogram_outputs/{category}_numeric_values.csv"
+                chart_df = pd.DataFrame(property_data, columns=['Numeric_Label', 'Value', 'Original_Property'])
+                chart_df.to_csv(csv_file, index=False)
+                charts_created += 1
+        
+        return True, f"Generated {charts_created} chart datasets directly from master CSV"
+        
+    except Exception as e:
+        return False, f"Error generating charts from master CSV: {str(e)}"
+
 def parse_events_from_output(output):
     """Parse events from GetPostHog.py output"""
     events = []
@@ -502,22 +573,47 @@ def run_histogram_generation():
         os.makedirs("csv_outputs", exist_ok=True)
         os.makedirs("histogram_outputs", exist_ok=True)
         
+        # Check if master CSV exists
+        master_csv = "csv_outputs/motor_data_master.csv"
+        if not os.path.exists(master_csv):
+            st.error("❌ Master CSV file not found. Please download some data first.")
+            return False, "Master CSV not found"
+        
         with st.spinner("Generating histograms..."):
             # Use sys.executable to ensure same Python environment
             result = subprocess.run(
                 [sys.executable, "-W", "ignore", "scripts/create_histograms.py"], 
                 capture_output=True, text=True, check=True
             )
-        st.success("✅ Histograms generated successfully!")
+            
+            # Show debug output
+            if result.stdout:
+                st.text("Script output:")
+                st.code(result.stdout, language="text")
+            
+            # Check if files were actually created
+            hist_files = glob.glob("histogram_outputs/*.png")
+            csv_files = glob.glob("histogram_outputs/*.csv")
+            
+            if hist_files or csv_files:
+                st.success(f"✅ Generated {len(hist_files)} images and {len(csv_files)} data files!")
+            else:
+                st.warning("⚠️ Script completed but no output files found.")
+                
         return True, result.stdout
+        
     except subprocess.CalledProcessError as e:
-        # Check if it's just a warning issue
-        if "NotOpenSSLWarning" in e.stderr or "urllib3" in e.stderr:
-            st.warning("⚠️ SSL warning encountered, but script may have run successfully. Check the results.")
-            return True, e.stderr
-        else:
-            st.error(f"❌ Error generating histograms: {e.stderr}")
-            return False, e.stderr
+        st.error(f"❌ Error generating histograms (exit code {e.returncode}):")
+        if e.stdout:
+            st.text("Script output:")
+            st.code(e.stdout, language="text")
+        if e.stderr:
+            st.text("Error details:")
+            st.code(e.stderr, language="text")
+        return False, e.stderr
+    except Exception as e:
+        st.error(f"❌ Unexpected error: {str(e)}")
+        return False, str(e)
 
 def fetch_bulk_events(person_id, event_count=None):
     """Fetch multiple events and combine them into a single dataset (only events with 160+ properties)"""
@@ -767,7 +863,19 @@ def main():
                 st.rerun()
         
         if st.button("📊 Generate Charts", use_container_width=True):
+            # Try the main histogram generation script first
             success, output = run_histogram_generation()
+            
+            # If that fails, try the backup method
+            if not success:
+                st.info("🔄 Trying backup chart generation method...")
+                backup_success, backup_output = generate_charts_from_master_csv()
+                if backup_success:
+                    st.success(f"✅ {backup_output}")
+                    success = True
+                else:
+                    st.error(f"❌ Backup method also failed: {backup_output}")
+            
             if success:
                 st.rerun()
     
