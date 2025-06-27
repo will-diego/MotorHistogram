@@ -549,6 +549,51 @@ def main():
         padding: 1rem !important;
     }
     
+    /* Force all tab content to dark theme */
+    .stTabs [data-baseweb="tab-panel"] > div {
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+    }
+    
+    /* Fix any nested content in tabs */
+    .stTabs [data-baseweb="tab-panel"] * {
+        color: #f8fafc !important;
+    }
+    
+    /* Override any light colored containers */
+    [data-testid="stVerticalBlock"], [data-testid="stHorizontalBlock"] {
+        background-color: transparent !important;
+    }
+    
+    /* Force block containers to be dark */
+    .block-container {
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+    }
+    
+    /* Fix any remaining white/light containers */
+    .element-container {
+        background-color: transparent !important;
+    }
+    
+    /* Override any stubborn light backgrounds */
+    .stContainer, .stColumn {
+        background-color: transparent !important;
+        color: #f8fafc !important;
+    }
+    
+    /* Make sure all divs in the main content are dark */
+    .main .block-container > div {
+        background-color: transparent !important;
+        color: #f8fafc !important;
+    }
+    
+    /* Force markdown and text elements to white */
+    .stMarkdown > div, .stText > div {
+        color: #f8fafc !important;
+        background-color: transparent !important;
+    }
+    
     /* Sidebar dark theme */
     .css-1d391kg, .css-1d391kg p, .stSidebar {
         background-color: #1e293b !important;
