@@ -85,9 +85,19 @@ def logout():
 def show_login_page():
     """Display the login page"""
     st.markdown("""
-    <div style="text-align: center; padding: 3rem 0;">
+    <div style="text-align: center; padding: 2rem 0;">
         <h1 style="color: #1f2937; font-size: 3rem; margin-bottom: 0.5rem;">🚗 Motor Data Analysis</h1>
-        <p style="color: #6b7280; font-size: 1.2rem; margin-bottom: 3rem;">Secure Dashboard Access</p>
+        <p style="color: #6b7280; font-size: 1.2rem; margin-bottom: 1rem;">Secure Dashboard Access</p>
+        <div style="background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; margin: 1rem auto; max-width: 600px;">
+            <p style="color: #4b5563; margin: 0;">Welcome to the Motor Data Analysis Dashboard! This secure platform allows you to:</p>
+            <ul style="text-align: left; color: #4b5563; margin: 1rem 0;">
+                <li>📊 View real-time motor performance data</li>
+                <li>📈 Analyze historical trends and patterns</li>
+                <li>🔍 Generate detailed performance reports</li>
+                <li>⚡ Monitor power and temperature metrics</li>
+            </ul>
+            <p style="color: #4b5563; margin: 0;">Please log in below to access these features.</p>
+        </div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -95,17 +105,6 @@ def show_login_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        # Login card
-        # st.markdown("""
-        # <div style="
-        #     background: white;
-        #     padding: 2rem;
-        #     border-radius: 1rem;
-        #     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        #     border: 1px solid #e5e7eb;
-        # "></div>
-        # """, unsafe_allow_html=True)
-        
         st.markdown("### 🔐 Login to Dashboard")
         
         with st.form("login_form"):
@@ -125,8 +124,6 @@ def show_login_page():
                         st.error("❌ Invalid username or password")
                 else:
                     st.warning("⚠️ Please enter both username and password")
-        
-
         
         st.markdown("---")
         st.markdown("""
