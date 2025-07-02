@@ -96,16 +96,15 @@ def show_login_page():
     
     with col2:
         # Login card
-        st.markdown("""
-        <div style="
-            background: white;
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e5e7eb;
-        ">
-        </div>
-        """, unsafe_allow_html=True)
+        # st.markdown("""
+        # <div style="
+        #     background: white;
+        #     padding: 2rem;
+        #     border-radius: 1rem;
+        #     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        #     border: 1px solid #e5e7eb;
+        # "></div>
+        # """, unsafe_allow_html=True)
         
         st.markdown("### 🔐 Login to Dashboard")
         
