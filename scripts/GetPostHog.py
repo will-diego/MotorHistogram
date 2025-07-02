@@ -236,6 +236,34 @@ if not motor_events:
 
 print(f"✅ Successfully fetched {len(motor_events)} Motor Data events from: {successful_url}")
 
+# === FILTER BY SPECIFIC TIMESTAMP IF PROVIDED ===
+if TARGET_TIMESTAMP:
+    print(f"🔍 Filtering for specific timestamp: {TARGET_TIMESTAMP}")
+    original_count = len(motor_events)
+    
+    # Filter events to find the one with matching timestamp
+    filtered_events = []
+    for event in motor_events:
+        event_timestamp = event.get('timestamp', '')
+        # Try exact match first
+        if event_timestamp == TARGET_TIMESTAMP:
+            filtered_events.append(event)
+        # Also try partial match (in case of precision differences)
+        elif TARGET_TIMESTAMP in event_timestamp or event_timestamp.startswith(TARGET_TIMESTAMP[:19]):
+            filtered_events.append(event)
+    
+    if filtered_events:
+        motor_events = filtered_events
+        print(f"✅ Found {len(filtered_events)} event(s) matching timestamp {TARGET_TIMESTAMP}")
+    else:
+        print(f"❌ No event found with timestamp matching: {TARGET_TIMESTAMP}")
+        print(f"📋 Available timestamps from {original_count} events:")
+        for i, event in enumerate(motor_events[:10]):  # Show first 10
+            print(f"   - {event.get('timestamp', 'Unknown')}")
+        if len(motor_events) > 10:
+            print(f"   ... and {len(motor_events) - 10} more")
+        exit(1)
+
 # === LIST EVENTS IF REQUESTED ===
 if args.list_events:
     print(f"\n📋 Found {len(motor_events)} Motor Data events:")
