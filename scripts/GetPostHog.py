@@ -224,6 +224,7 @@ def fetch_motor_data_events(person_id, session_id=None, limit=200):
 # Fetch all Motor Data events for the person
 motor_events, successful_url = fetch_motor_data_events(PERSON_ID, SESSION_ID)
 
+# === SELECT AND PROCESS ALL EVENTS ===
 if not motor_events:
     print("❌ Failed to fetch Motor Data events. Please check:")
     print("1. API key permissions (needs 'query:read' scope)")
@@ -235,160 +236,84 @@ if not motor_events:
 
 print(f"✅ Successfully fetched {len(motor_events)} Motor Data events from: {successful_url}")
 
-# === SELECT SPECIFIC EVENT ===
-data = None
+# === PROCESS ALL EVENTS ===
+all_power_data = []
+all_torque_data = []
+all_motor_temp_data = []
+all_mosfet_temp_data = []
+all_mosfet_cooldown_data = []
+all_motor_cooldown_data = []
 
-if args.list_events:
-    # Just list all events and exit
-    print(f"\n📋 Found {len(motor_events)} Motor Data events:")
-    for i, event in enumerate(motor_events):
-        timestamp = event.get('timestamp', 'Unknown')
-        event_id = event.get('id', 'Unknown')
-        properties_count = len(event.get('properties', {}))
-        session_id = event.get('properties', {}).get('$session_id', 'Unknown')
-        print(f"   {i+1}. {timestamp} (Session: {session_id}, {properties_count} properties)")
-    exit(0)
+for data in motor_events:
+    event_properties = data.get("properties", {})
+    timestamp = data.get("timestamp", "")
+    if not event_properties:
+        continue
+    # Initialize categorized dictionaries for this event
+    power_data = {"timestamp": timestamp}
+    torque_data = {"timestamp": timestamp}
+    motor_temp_data = {"timestamp": timestamp}
+    mosfet_temp_data = {"timestamp": timestamp}
+    mosfet_cooldown_data = {"timestamp": timestamp}
+    motor_cooldown_data = {"timestamp": timestamp}
+    # Categorize properties
+    for key, value in event_properties.items():
+        key_lower = key.lower()
+        if key_lower.startswith('power'):
+            power_data[key] = value
+        elif key_lower.startswith('torque'):
+            torque_data[key] = value
+        elif 'motortemp' in key_lower:
+            motor_temp_data[key] = value
+        elif 'mosfettemp' in key_lower and 'cooldown' not in key_lower:
+            mosfet_temp_data[key] = value
+        elif 'mosfet' in key_lower and 'cooldown' in key_lower:
+            mosfet_cooldown_data[key] = value
+        elif 'cooldownmosfet' in key_lower:
+            mosfet_cooldown_data[key] = value
+        elif 'motor' in key_lower and 'cooldown' in key_lower:
+            motor_cooldown_data[key] = value
+        elif 'cooldownmotor' in key_lower:
+            motor_cooldown_data[key] = value
+    # Append to lists if there is data beyond timestamp
+    if len(power_data) > 1:
+        all_power_data.append(power_data)
+    if len(torque_data) > 1:
+        all_torque_data.append(torque_data)
+    if len(motor_temp_data) > 1:
+        all_motor_temp_data.append(motor_temp_data)
+    if len(mosfet_temp_data) > 1:
+        all_mosfet_temp_data.append(mosfet_temp_data)
+    if len(mosfet_cooldown_data) > 1:
+        all_mosfet_cooldown_data.append(mosfet_cooldown_data)
+    if len(motor_cooldown_data) > 1:
+        all_motor_cooldown_data.append(motor_cooldown_data)
 
-elif TARGET_TIMESTAMP:
-    # Find event with matching timestamp (handle both Z and +00:00 formats)
-    print(f"🔍 Looking for event with timestamp: {TARGET_TIMESTAMP}")
-    
-    # Normalize the target timestamp - remove Z suffix if present
-    search_timestamp = TARGET_TIMESTAMP.replace('Z', '').rstrip('Z')
-    
-    for event in motor_events:
-        event_timestamp = event.get('timestamp', '')
-        # Normalize event timestamp for comparison
-        normalized_event_timestamp = event_timestamp.replace('+00:00', '').replace('Z', '')
-        
-        if (search_timestamp in event_timestamp or 
-            event_timestamp.startswith(search_timestamp) or
-            search_timestamp in normalized_event_timestamp or
-            normalized_event_timestamp.startswith(search_timestamp)):
-            data = event
-            print(f"   ✅ Found matching event: {event_timestamp}")
-            break
-    
-    if not data:
-        print(f"   ❌ No event found with timestamp matching: {TARGET_TIMESTAMP}")
-        print(f"   Available timestamps:")
-        for event in motor_events[:5]:
-            print(f"      - {event.get('timestamp', 'Unknown')}")
-        exit(1)
+# === WRITE ALL EVENTS TO CSV FILES ===
+def write_all_events_to_csv(filename, data_list):
+    if not data_list:
+        print(f"⚠️  No data for {filename}")
+        return
+    # Collect all possible fieldnames
+    fieldnames = set()
+    for row in data_list:
+        fieldnames.update(row.keys())
+    fieldnames = sorted(fieldnames)
+    with open(filename, mode='w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in data_list:
+            writer.writerow(row)
+    print(f"✅ Saved {len(data_list)} events to {filename}")
 
-elif args.interactive or len(motor_events) > 1:
-    # Show available events and let user choose
-    print(f"\n📋 Found {len(motor_events)} Motor Data events:")
-    for i, event in enumerate(motor_events):
-        timestamp = event.get('timestamp', 'Unknown')
-        properties_count = len(event.get('properties', {}))
-        print(f"   {i+1}. {timestamp} ({properties_count} properties)")
-    
-    if args.interactive:
-        while True:
-            try:
-                choice = input(f"\nEnter event number (1-{len(motor_events)}) or press Enter for most recent: ").strip()
-                if not choice:
-                    choice = 1  # Default to most recent (first in list)
-                else:
-                    choice = int(choice)
-                
-                if 1 <= choice <= len(motor_events):
-                    data = motor_events[choice - 1]
-                    selected_timestamp = data.get('timestamp', 'Unknown')
-                    print(f"✅ Selected event: {selected_timestamp}")
-                    break
-                else:
-                    print(f"❌ Invalid choice. Please enter 1-{len(motor_events)}")
-            except ValueError:
-                print("❌ Invalid input. Please enter a number.")
-    else:
-        # Use most recent event
-        data = motor_events[0]
-        print(f"🎯 Using most recent event: {data.get('timestamp', 'Unknown')}")
-
-else:
-    # Single event found, use it
-    data = motor_events[0]
-    print(f"🎯 Using event: {data.get('timestamp', 'Unknown')}")
-
-print(f"📊 Event data keys: {list(data.keys())}")
-
-# === PARSE PROPERTIES ===
-event_properties = data.get("properties", {})
-timestamp = data.get("timestamp", "")
-
-if not event_properties:
-    print("⚠️  No properties found in event data")
-    print(f"Raw data structure: {json.dumps(data, indent=2)[:500]}...")
-    exit(1)
-
-print(f"📝 Found {len(event_properties)} properties")
-
-# Initialize categorized dictionaries
-power_data = {"timestamp": timestamp}
-torque_data = {"timestamp": timestamp}
-motor_temp_data = {"timestamp": timestamp}
-mosfet_temp_data = {"timestamp": timestamp}
-mosfet_cooldown_data = {"timestamp": timestamp}
-motor_cooldown_data = {"timestamp": timestamp}
-
-# === CATEGORIZE PROPERTIES ===
-for key, value in event_properties.items():
-    key_lower = key.lower()
-    
-    # Power properties
-    if key_lower.startswith('power'):
-        power_data[key] = value
-    
-    # Torque properties
-    elif key_lower.startswith('torque'):
-        torque_data[key] = value
-    
-    # Motor temperature properties
-    elif 'motortemp' in key_lower:
-        motor_temp_data[key] = value
-    
-    # MOSFET temperature properties (excluding cooldown)
-    elif 'mosfettemp' in key_lower and 'cooldown' not in key_lower:
-        mosfet_temp_data[key] = value
-    
-    # MOSFET cooldown properties
-    elif 'mosfet' in key_lower and 'cooldown' in key_lower:
-        mosfet_cooldown_data[key] = value
-    elif 'cooldownmosfet' in key_lower:
-        mosfet_cooldown_data[key] = value
-    
-    # Motor cooldown properties
-    elif 'motor' in key_lower and 'cooldown' in key_lower:
-        motor_cooldown_data[key] = value
-    elif 'cooldownmotor' in key_lower:
-        motor_cooldown_data[key] = value
-
-# === WRITE TO SEPARATE CSV FILES ===
-categories = {
-    'power': power_data,
-    'torque': torque_data,
-    'motor_temp': motor_temp_data,
-    'mosfet_temp': mosfet_temp_data,
-    'mosfet_cooldown': mosfet_cooldown_data,
-    'motor_cooldown': motor_cooldown_data
-}
-
-for category_name, category_data in categories.items():
-    if len(category_data) > 1:  # Only create file if there's data beyond timestamp
-        csv_file = f"csv_outputs/posthog_event_{category_name}.csv"
-        
-        with open(csv_file, mode='w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=category_data.keys())
-            writer.writeheader()
-            writer.writerow(category_data)
-        
-        print(f"✅ {category_name.replace('_', ' ').title()} data saved to {csv_file} ({len(category_data)-1} properties)")
-    else:
-        print(f"⚠️  No {category_name.replace('_', ' ')} properties found in event data")
+write_all_events_to_csv("csv_outputs/posthog_event_power.csv", all_power_data)
+write_all_events_to_csv("csv_outputs/posthog_event_torque.csv", all_torque_data)
+write_all_events_to_csv("csv_outputs/posthog_event_motor_temp.csv", all_motor_temp_data)
+write_all_events_to_csv("csv_outputs/posthog_event_mosfet_temp.csv", all_mosfet_temp_data)
+write_all_events_to_csv("csv_outputs/posthog_event_mosfet_cooldown.csv", all_mosfet_cooldown_data)
+write_all_events_to_csv("csv_outputs/posthog_event_motor_cooldown.csv", all_motor_cooldown_data)
 
 # === SUMMARY ===
-total_properties = len(event_properties)
-categorized_properties = sum(len(data)-1 for data in categories.values() if len(data) > 1)
-print(f"\n📊 Summary: {categorized_properties}/{total_properties} properties categorized")
+total_properties = sum(len(event.get('properties', {})) for event in motor_events)
+categorized_properties = sum(len(row)-1 for row in all_power_data + all_torque_data + all_motor_temp_data + all_mosfet_temp_data + all_mosfet_cooldown_data + all_motor_cooldown_data)
+print(f"\n📊 Summary: {categorized_properties}/{total_properties} properties categorized across all events")
