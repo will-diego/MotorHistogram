@@ -236,6 +236,16 @@ if not motor_events:
 
 print(f"✅ Successfully fetched {len(motor_events)} Motor Data events from: {successful_url}")
 
+# === LIST EVENTS IF REQUESTED ===
+if args.list_events:
+    print(f"\n📋 Found {len(motor_events)} Motor Data events:")
+    for i, event in enumerate(motor_events):
+        timestamp = event.get('timestamp', 'Unknown')
+        properties_count = len(event.get('properties', {}))
+        session_id = event.get('properties', {}).get('$session_id', 'Unknown')
+        print(f"   {i+1}. {timestamp} (Session: {session_id}, {properties_count} properties)")
+    exit(0)
+
 # === PROCESS ALL EVENTS ===
 all_power_data = []
 all_torque_data = []
