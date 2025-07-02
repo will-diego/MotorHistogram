@@ -427,7 +427,7 @@ def fetch_events_list(person_id):
         os.makedirs("histogram_outputs", exist_ok=True)
         
         # Use sys.executable to ensure same Python environment  
-        cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-s", "", "-l"]
+        cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-l"]
         
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
         
@@ -455,7 +455,7 @@ def fetch_specific_event_data(person_id, timestamp):
         os.makedirs("histogram_outputs", exist_ok=True)
         
         # Use sys.executable to ensure same Python environment
-        cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", timestamp, "-s", ""]
+        cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", timestamp]
         
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=".", timeout=60)
         
@@ -627,7 +627,7 @@ def fetch_bulk_events(person_id, event_count=None):
         os.makedirs("histogram_outputs", exist_ok=True)
         
         # First get the list of events
-        cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-s", "", "-l"]
+        cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-l"]
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=".", timeout=120)
         
         if result.returncode != 0:
@@ -672,7 +672,7 @@ def fetch_bulk_events(person_id, event_count=None):
             status_text.text(f"Downloading event {i+1}/{len(selected_events)}: {event['timestamp'][:16]} ({event['properties_count']} properties)...")
             
             # Download individual event using the working GetPostHog.py script
-            event_cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", event['timestamp'], "-s", ""]
+            event_cmd = [sys.executable, "-W", "ignore", "scripts/GetPostHog.py", "-p", person_id, "-t", event['timestamp']]
             event_result = subprocess.run(event_cmd, capture_output=True, text=True, cwd=".", timeout=60)
             
             if event_result.returncode == 0:
