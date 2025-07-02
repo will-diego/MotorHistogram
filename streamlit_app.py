@@ -937,11 +937,11 @@ def main():
             if 'event_page' not in st.session_state:
                 st.session_state.event_page = 0
             
-            # Convert the parsed events to a more structured format (quality filter: 160-170 properties)
+            # Convert the parsed events to a more structured format (show all events)
             formatted_events = []
-            quality_events = [event for event in events if 160 <= event['properties_count'] <= 170]
+            all_events = events  # Show all events, not just those with specific property counts
             
-            for i, event in enumerate(quality_events, 1):
+            for i, event in enumerate(all_events, 1):
                 formatted_events.append({
                     'number': str(i),
                     'timestamp': event['timestamp'],
@@ -950,9 +950,8 @@ def main():
                     'details': event.get('line', '')
                 })
             
-            # Show filtering info
-            if len(quality_events) < len(events):
-                st.info(f"🔍 Quality filter applied: Showing {len(quality_events)} events with 160-170 properties (filtered out {len(events) - len(quality_events)} events outside optimal range)")
+            # Show event count info
+            st.info(f"📋 Showing all {len(all_events)} available Motor Data events")
             
             # Pagination settings
             events_per_page = 10
@@ -1067,14 +1066,14 @@ def main():
             # Bulk download section
             st.markdown("---")
             st.markdown("### 📦 Bulk Downloads")
-            st.markdown("*Download multiple events at once for comprehensive analysis (160-170 properties only)*")
+            st.markdown("*Download multiple events at once for comprehensive analysis*")
             
             col1, col2, col3 = st.columns([1, 1, 1])
             
             with col1:
-                if st.button("📥 Get Last 5 Quality Events", use_container_width=True, type="secondary", 
-                           help="Download and combine the 5 most recent events with 160-170 properties"):
-                    with st.spinner("📥 Downloading last 5 quality events..."):
+                if st.button("📥 Get Last 5 Events", use_container_width=True, type="secondary", 
+                           help="Download and combine the 5 most recent events"):
+                    with st.spinner("📥 Downloading last 5 events..."):
                         success, output = fetch_bulk_events(person_id, event_count=5)
                     
                     if success:
@@ -1087,15 +1086,15 @@ def main():
                         st.info("💡 Try refreshing the list or downloading individual events.")
             
             with col2:
-                if st.button("📥 Get All Quality Events", use_container_width=True, type="secondary",
-                           help="Download all available quality events with 160-170 properties (may take several minutes)"):
+                if st.button("📥 Get All Events", use_container_width=True, type="secondary",
+                           help="Download all available events (may take several minutes)"):
                     # Show confirmation dialog
                     if 'confirm_all_events' not in st.session_state:
                         st.session_state.confirm_all_events = True
-                        st.warning("⚠️ This will download ALL quality events (160-170 properties) and may take several minutes. Click again to confirm.")
+                        st.warning("⚠️ This will download ALL events and may take several minutes. Click again to confirm.")
                     else:
                         del st.session_state.confirm_all_events
-                        with st.spinner("📥 Downloading all quality events... This may take several minutes..."):
+                        with st.spinner("📥 Downloading all events... This may take several minutes..."):
                             success, output = fetch_bulk_events(person_id, event_count=None)
                         
                         if success:
@@ -1108,14 +1107,14 @@ def main():
                             st.info("💡 Try downloading fewer events or check your connection.")
             
             with col3:
-                # Get current page events (they're already quality filtered)
+                # Get current page events
                 current_page_timestamps = [event['timestamp'] for event in current_events]
-                quality_events_on_page = len(current_page_timestamps)
+                events_on_page = len(current_page_timestamps)
                 
-                if quality_events_on_page > 0:
-                    if st.button(f"📥 Get Current Page ({quality_events_on_page} quality events)", use_container_width=True, type="secondary",
-                               help=f"Download all {quality_events_on_page} quality events from the current page"):
-                        with st.spinner(f"📥 Downloading {quality_events_on_page} quality events from current page..."):
+                if events_on_page > 0:
+                    if st.button(f"📥 Get Current Page ({events_on_page} events)", use_container_width=True, type="secondary",
+                               help=f"Download all {events_on_page} events from the current page"):
+                        with st.spinner(f"📥 Downloading {events_on_page} events from current page..."):
                             # Use bulk download approach for consistency
                             success_count = 0
                             for event in current_events:
@@ -1124,7 +1123,7 @@ def main():
                                     success_count += 1
                         
                         if success_count > 0:
-                            st.success(f"✅ Downloaded {success_count}/{quality_events_on_page} quality events from current page!")
+                            st.success(f"✅ Downloaded {success_count}/{events_on_page} events from current page!")
                             st.session_state.show_event_browser = False
                             if 'event_page' in st.session_state:
                                 del st.session_state.event_page  # Reset pagination
@@ -1133,7 +1132,7 @@ def main():
                             st.error("❌ Failed to download any events from current page")
                 else:
                     st.button("📥 Current Page", disabled=True, use_container_width=True, 
-                            help="No quality events on current page")
+                            help="No events on current page")
 
         else:
             st.error("❌ No events found in the output")
