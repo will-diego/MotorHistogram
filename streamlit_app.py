@@ -775,51 +775,47 @@ def main():
         show_login_page()
         return
     
-    # Add clean dark theme CSS
+    # Add adaptive theme CSS that works in both light and dark modes
     st.markdown("""
     <style>
-    /* Clean dark theme */
-    .stApp {
-        background-color: #0f172a;
-        color: #f8fafc;
-    }
-    
-    /* Sidebar */
-    .stSidebar {
-        background-color: #1e293b;
-    }
-    
-    /* Buttons */
+    /* Improve readability and accessibility */
     .stButton button {
-        background-color: #3b82f6;
-        color: white;
-        border: none;
+        border: 1px solid #e0e0e0;
     }
     
-    /* Tables */
+    /* Ensure good contrast for metrics */
+    .stMetric {
+        background-color: var(--background-color);
+        border: 1px solid var(--border-color);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin: 0.5rem 0;
+    }
+    
+    /* Ensure tables are readable */
     .stDataFrame {
-        background-color: #1e293b;
+        border: 1px solid var(--border-color);
     }
     
-    /* Text inputs */
+    /* Make sure text is always readable */
+    .stMarkdown, .stText {
+        color: var(--text-color);
+    }
+    
+    /* Ensure selectboxes and inputs are visible */
     .stSelectbox > div > div, .stTextInput > div > div > input {
-        background-color: #334155;
-        color: #f8fafc;
+        border: 1px solid #ccc;
     }
     
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #1e293b;
-    }
-    
+    /* Improve tab visibility */
     .stTabs [data-baseweb="tab-list"] button {
-        background-color: #334155;
-        color: #cbd5e1;
+        border: 1px solid #ddd;
+        margin-right: 2px;
     }
     
     .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
-        background-color: #0f172a;
-        color: #ffffff;
+        border-bottom: 2px solid #1f77b4;
+        font-weight: bold;
     }
     </style>
     """, unsafe_allow_html=True)
