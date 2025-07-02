@@ -39,26 +39,26 @@ def main():
     categories = {
         'power': {
             'range': list(range(25, 901, 25)),  # 25, 50, 75... 900
-            'title': 'Motor Power Distribution (Occurrence Count)',
-            'ylabel': 'Number of Occurrences',
+            'title': 'Motor Power Distribution (Sum of All Events)',
+            'ylabel': 'Total Power Values',
             'pattern': r'power(\d+)'
         },
         'torque': {
             'range': list(range(2, 91, 2)),     # 2, 4, 6... 90
-            'title': 'Motor Torque Distribution (Occurrence Count)', 
-            'ylabel': 'Number of Occurrences',
+            'title': 'Motor Torque Distribution (Sum of All Events)', 
+            'ylabel': 'Total Torque Values',
             'pattern': r'torque(\d+)'
         },
         'motor_temp': {
             'range': list(range(10, 201, 10)),  # 10, 20, 30... 200
-            'title': 'Motor Temperature Distribution (Occurrence Count)',
-            'ylabel': 'Number of Occurrences',
+            'title': 'Motor Temperature Distribution (Sum of All Events)',
+            'ylabel': 'Total Temperature (°C)',
             'pattern': r'motor.*temp.*(\d+)'
         },
         'mosfet_temp': {
             'range': list(range(10, 201, 10)), # 10, 20, 30... 200
-            'title': 'MOSFET Temperature Distribution (Occurrence Count)',
-            'ylabel': 'Number of Occurrences', 
+            'title': 'MOSFET Temperature Distribution (Sum of All Events)',
+            'ylabel': 'Total Temperature (°C)', 
             'pattern': r'mosfet.*temp.*(\d+)'
         }
     }
@@ -69,7 +69,7 @@ def main():
     for category_name, config in categories.items():
         print(f"\n🔍 Processing {category_name}...")
         
-        # Find matching columns and count occurrences
+        # Find matching columns and sum all values
         matching_data = {}
         for col in df.columns:
             if col == 'timestamp':
@@ -93,24 +93,30 @@ def main():
                     index = int(match.group(1))
             
             elif category_name == 'mosfet_temp' and ('mosfet' in col.lower() and 'temp' in col.lower()):
-                match = re.search(r'(\d+)', col)
+                # Handle 3-digit MOSFET temp format like mosfetTemp040, mosfetTemp050, etc.
+                match = re.search(r'(\d{3})$', col)
                 if match:
-                    index = int(match.group(1))
+                    # Convert 3-digit format to actual temperature (040 -> 40, 050 -> 50, etc.)
+                    temp_str = match.group(1)
+                    index = int(temp_str)
+                    # Remove leading zero for temperatures like 040 -> 40
+                    if temp_str.startswith('0') and len(temp_str) == 3:
+                        index = int(temp_str.lstrip('0')) if temp_str.lstrip('0') else 0
             
-            # If we found a valid index and it's in our range, count non-null occurrences
+            # If we found a valid index and it's in our range, sum all values
             if index is not None and index in config['range']:
-                # Count how many non-null values (occurrences) in this column across all rows
-                occurrence_count = df[col].notna().sum()
-                if occurrence_count > 0:  # Only include if there are actual occurrences
-                    matching_data[index] = occurrence_count
+                # Sum all non-null values in this column across all rows
+                column_sum = df[col].fillna(0).sum()
+                if column_sum > 0:  # Only include if there's actual data
+                    matching_data[index] = column_sum
         
         # Create complete range with zeros for missing values
         full_range = config['range']
         full_values = [matching_data.get(idx, 0) for idx in full_range]
         
         print(f"   ✅ Found data for {len(matching_data)} indices out of {len(full_range)} total")
-        total_occurrences = sum(matching_data.values())
-        print(f"   📊 Total occurrences across all events: {total_occurrences}")
+        total_sum = sum(matching_data.values())
+        print(f"   📊 Total sum across all events: {total_sum:.1f}")
         
         # Create chart
         if create_simple_chart(full_range, full_values, category_name, config, OUTPUT_DIR, FIGURE_SIZE):
@@ -168,8 +174,8 @@ def create_simple_chart(indices, values, category_name, config, output_dir, figu
         if non_zero_values:
             stats_text = f'Total Indices: {len(indices)}\n'
             stats_text += f'With Data: {len(non_zero_values)}\n'
-            stats_text += f'Max Occurrences: {max(non_zero_values)}\n'
-            stats_text += f'Total Occurrences: {sum(non_zero_values)}'
+            stats_text += f'Max Value: {max(non_zero_values):.1f}\n'
+            stats_text += f'Total Sum: {sum(non_zero_values):.1f}'
         else:
             stats_text = f'Total Indices: {len(indices)}\nNo data found'
         
